@@ -32,6 +32,7 @@ import {
   type VisionOrgId,
   type VisionServingPath,
   type VisionSiteId,
+  VISION_MODEL_PRESETS,
 } from '../../../vision/fleetWorld'
 import { externalModelsForOrg } from '../../../vision/externalModelSeed'
 import { groupModelInstancesByModelId, servicesModelsForOrg } from '../../../vision/legacyModelInstanceSeed'
@@ -92,11 +93,21 @@ export const VisionModelFleetPage = ({
   const [listSearch, setListSearch] = useState('')
   const [placePresetId, setPlacePresetId] = useState<string | null>(null)
   const [addOfferingId, setAddOfferingId] = useState<string | null>(null)
+  const [modelFilter, setModelFilter] = useState('all')
 
-  const visibleClusters = useMemo(
+  const orgFilteredClusters = useMemo(
     () => clusters.filter((cluster) => clusterMatchesFilters(cluster, orgFilter, 'all')),
     [clusters, orgFilter],
   )
+  const visibleClusters = useMemo(() => {
+    if (modelFilter === 'all') return orgFilteredClusters
+    const clusterIdsWithModel = new Set(
+      deployments
+        .filter((d) => d.presetId === modelFilter)
+        .map((d) => d.clusterId),
+    )
+    return orgFilteredClusters.filter((c) => clusterIdsWithModel.has(c.id))
+  }, [orgFilteredClusters, deployments, modelFilter])
   const visibleDeployments = useMemo(
     () =>
       deployments.filter((deployment) =>
@@ -258,6 +269,9 @@ export const VisionModelFleetPage = ({
         onOrgChange={setOrgFilter}
         onViewChange={handleViewChange}
         showTenantFilter={!lockedOrgId}
+        modelFilter={modelFilter}
+        onModelFilterChange={setModelFilter}
+        availableModels={VISION_MODEL_PRESETS}
       />
       <Divider inset={{ default: 'insetNone' }} />
       <div className="ai-grid-future-vision__fleet" aria-label="AI Grid map and drawer">

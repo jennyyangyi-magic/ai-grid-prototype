@@ -9,7 +9,8 @@ import {
   ToolbarItem,
   Tooltip,
 } from '@patternfly/react-core'
-import type { VisionOrgId } from '../../../vision/fleetWorld'
+import { FormSelect, FormSelectOption } from '@patternfly/react-core'
+import type { VisionOrgId, VisionModelPreset } from '../../../vision/fleetWorld'
 import type { VisionDrawerTab } from '../../../vision/visionDrawer'
 import VisionOrgSelect from '../../../vision/VisionOrgSelect'
 
@@ -19,6 +20,9 @@ type VisionGridFiltersProps = {
   onOrgChange: (value: VisionOrgId) => void
   onViewChange: (view: VisionDrawerTab) => void
   showTenantFilter?: boolean
+  modelFilter?: string
+  onModelFilterChange?: (value: string) => void
+  availableModels?: VisionModelPreset[]
 }
 
 export const VisionGridFilters = ({
@@ -27,6 +31,9 @@ export const VisionGridFilters = ({
   onOrgChange,
   onViewChange,
   showTenantFilter = true,
+  modelFilter = 'all',
+  onModelFilterChange,
+  availableModels = [],
 }: VisionGridFiltersProps) => {
   const catalogTriggerRef = useRef<HTMLElement>(null)
   const servicesTriggerRef = useRef<HTMLElement>(null)
@@ -61,6 +68,25 @@ export const VisionGridFilters = ({
                 onChange={onOrgChange}
                 menuToggle
               />
+            </ToolbarItem>
+          ) : null}
+          {onModelFilterChange && availableModels.length > 0 ? (
+            <ToolbarItem>
+              <FormSelect
+                id="vision-filter-model"
+                value={modelFilter}
+                onChange={(_event, value) => onModelFilterChange(value)}
+                aria-label="Filter by model"
+              >
+                <FormSelectOption value="all" label="All models" />
+                {availableModels.map((model) => (
+                  <FormSelectOption
+                    key={model.id}
+                    value={model.id}
+                    label={model.displayName}
+                  />
+                ))}
+              </FormSelect>
             </ToolbarItem>
           ) : null}
         </ToolbarGroup>

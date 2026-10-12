@@ -42,6 +42,13 @@ export const VisionClusterInspector = ({ cluster }: VisionClusterInspectorProps)
   const isAvailable = cluster.health === 'available'
   const nestedModels = modelsOnCluster(cluster.id)
 
+  const enrollmentColor =
+    cluster.enrollmentStatus === 'active'
+      ? 'green'
+      : cluster.enrollmentStatus === 'frozen'
+        ? 'orange'
+        : 'blue'
+
   return (
     <Stack hasGutter>
       <StackItem>
@@ -49,6 +56,11 @@ export const VisionClusterInspector = ({ cluster }: VisionClusterInspectorProps)
           <FlexItem>
             <Label color={isAvailable ? 'green' : 'red'} isCompact>
               {isAvailable ? 'Available' : 'Unavailable'}
+            </Label>
+          </FlexItem>
+          <FlexItem>
+            <Label color={enrollmentColor} isCompact variant="outline">
+              {cluster.enrollmentStatus}
             </Label>
           </FlexItem>
           <FlexItem>
@@ -79,7 +91,7 @@ export const VisionClusterInspector = ({ cluster }: VisionClusterInspectorProps)
           <DescriptionListGroup>
             <DescriptionListTerm>GPUs</DescriptionListTerm>
             <DescriptionListDescription>
-              {cluster.gpuCount} · {cluster.gpuUtilPercent}% utilized
+              {cluster.gpuCount}× {cluster.gpuType} · {cluster.gpuUtilPercent}% utilized
             </DescriptionListDescription>
           </DescriptionListGroup>
           <DescriptionListGroup>

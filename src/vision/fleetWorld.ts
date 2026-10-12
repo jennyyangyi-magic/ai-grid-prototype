@@ -2,6 +2,7 @@ export type VisionOrgId = 'nsb' | 'bluesolace'
 export type VisionGatewayId = 'nsb-retail' | 'nsb-markets' | 'nsb-west' | 'nsb-east' | 'bsfg-us'
 export type VisionSiteId = 'us-west-1-dc-a' | 'us-east-1-dc-b' | 'us-central-1-dc-a' | 'eu-west-1-dc-a'
 export type VisionClusterHealth = 'available' | 'unavailable'
+export type VisionEnrollmentStatus = 'active' | 'frozen' | 'enrolling'
 export type VisionOrgFilter = 'all' | VisionOrgId
 export type VisionGatewayFilter = 'all' | VisionGatewayId
 
@@ -37,9 +38,11 @@ export type VisionCluster = {
   platform: string
   region: string
   health: VisionClusterHealth
+  enrollmentStatus: VisionEnrollmentStatus
   nodeCount: number
   nodesReady: number
   gpuCount: number
+  gpuType: string
   gpuUtilPercent: number
   openshiftVersion: string
   x: number
@@ -267,9 +270,11 @@ export const createInitialClusters = (): VisionCluster[] => [
     platform: 'Azure',
     region: 'westus',
     health: 'available',
+    enrollmentStatus: 'active',
     nodeCount: 3,
     nodesReady: 3,
     gpuCount: 3,
+    gpuType: 'NVIDIA T4',
     gpuUtilPercent: 12,
     openshiftVersion: '4.21.20',
     x: 16,
@@ -284,9 +289,11 @@ export const createInitialClusters = (): VisionCluster[] => [
     platform: 'Azure',
     region: 'westus',
     health: 'unavailable',
+    enrollmentStatus: 'frozen',
     nodeCount: 3,
     nodesReady: 0,
     gpuCount: 3,
+    gpuType: 'NVIDIA A100',
     gpuUtilPercent: 0,
     openshiftVersion: '4.21.20',
     x: 18.5,
@@ -301,9 +308,11 @@ export const createInitialClusters = (): VisionCluster[] => [
     platform: 'AWS',
     region: 'us-east-1',
     health: 'available',
+    enrollmentStatus: 'active',
     nodeCount: 3,
     nodesReady: 3,
     gpuCount: 4,
+    gpuType: 'NVIDIA T4',
     gpuUtilPercent: 41,
     openshiftVersion: '4.21.20',
     x: 34,
@@ -318,9 +327,11 @@ export const createInitialClusters = (): VisionCluster[] => [
     platform: 'AWS',
     region: 'us-east-1',
     health: 'unavailable',
+    enrollmentStatus: 'enrolling',
     nodeCount: 2,
     nodesReady: 0,
     gpuCount: 4,
+    gpuType: 'NVIDIA H100',
     gpuUtilPercent: 0,
     openshiftVersion: '4.21.20',
     x: 36.5,
@@ -335,9 +346,11 @@ export const createInitialClusters = (): VisionCluster[] => [
     platform: 'On-prem',
     region: 'us-central-1',
     health: 'available',
+    enrollmentStatus: 'active',
     nodeCount: 4,
     nodesReady: 4,
     gpuCount: 8,
+    gpuType: 'NVIDIA A100',
     gpuUtilPercent: 22,
     openshiftVersion: '4.21.18',
     x: 26,
@@ -352,9 +365,11 @@ export const createInitialClusters = (): VisionCluster[] => [
     platform: 'Azure',
     region: 'westeurope',
     health: 'available',
+    enrollmentStatus: 'active',
     nodeCount: 3,
     nodesReady: 3,
     gpuCount: 2,
+    gpuType: 'NVIDIA T4',
     gpuUtilPercent: 18,
     openshiftVersion: '4.21.20',
     x: 56,
@@ -369,9 +384,11 @@ export const createInitialClusters = (): VisionCluster[] => [
     platform: 'Azure',
     region: 'westeurope',
     health: 'available',
+    enrollmentStatus: 'active',
     nodeCount: 3,
     nodesReady: 3,
     gpuCount: 2,
+    gpuType: 'NVIDIA T4',
     gpuUtilPercent: 9,
     openshiftVersion: '4.21.18',
     x: 59.5,
@@ -755,9 +772,11 @@ export const createClusterFromOffering = (
     platform: platform.platform,
     region: platform.region,
     health: 'available',
+    enrollmentStatus: 'active',
     nodeCount: offering.nodeCount,
     nodesReady: offering.nodeCount,
     gpuCount: offering.gpuCount,
+    gpuType: offering.gpuCount > 0 ? 'NVIDIA T4' : 'None',
     gpuUtilPercent: 0,
     openshiftVersion: '4.21.20',
     x: Math.min(96, site.x + offset),
