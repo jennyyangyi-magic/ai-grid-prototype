@@ -1,6 +1,6 @@
 # Build and deploy static site to GitHub Pages.
 # After the first successful run: Repo → Settings → Pages → Source: GitHub Actions.
-# Live URL: https://heyethankim.github.io/osac-bmaas/
+# Live URL: https://jennyyangyi-magic.github.io/ai-grid-prototype/
 name: Deploy to GitHub Pages
 
 on:
