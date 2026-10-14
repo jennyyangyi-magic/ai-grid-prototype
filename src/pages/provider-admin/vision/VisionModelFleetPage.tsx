@@ -236,7 +236,7 @@ export const VisionModelFleetPage = ({
     const allowedGateways = gatewaysForOrgFilter('all')
     const gatewayId: VisionGatewayId = allowedGateways[0]?.id ?? 'nsb-retail'
 
-    const created = createClusterFromOffering(offering, siteId, 'all', gatewayId, clusters)
+    const created = createClusterFromOffering(offering, siteId, 'nsb', gatewayId, clusters)
     setClusters((current) => [...current, created])
     openDetails({ kind: 'cluster', clusterId: created.id }, 'services')
     setAddOfferingId(null)

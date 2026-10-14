@@ -424,7 +424,6 @@ export function TenantAdminWorkspacePage() {
         return (
           <VisionModelFleetPage
             catalogItems={visionCatalogItems}
-            lockedOrgId="nsb"
             onOpenCatalogPreset={(catalogItemId) => {
               setOpenCatalogItemKey(catalogItemId)
               handleNavChange('catalog')
