@@ -17,7 +17,6 @@ import { useState } from 'react'
 import { Area, AreaChart, ResponsiveContainer, Tooltip as RechartsTooltip, YAxis } from 'recharts'
 import { ModelsInstanceCard } from '../../../components/catalog/ModelsInstanceCard'
 import {
-  getVisionOrg,
   getVisionSite,
   type VisionCluster,
 } from '../../../vision/fleetWorld'
@@ -95,8 +94,7 @@ export const VisionClusterInspector = ({ cluster }: VisionClusterInspectorProps)
       <Stack hasGutter>
         <StackItem>
           <Content component="p">
-            This cluster is hidden by the tenant filter. Use Catalog or Services to return to the
-            list.
+            Select a cluster on the map to view its details.
           </Content>
         </StackItem>
       </Stack>
@@ -104,7 +102,6 @@ export const VisionClusterInspector = ({ cluster }: VisionClusterInspectorProps)
   }
 
   const site = getVisionSite(cluster.siteId)
-  const org = getVisionOrg(cluster.orgId)
   const nestedModels = modelsOnCluster(cluster.id)
 
   const tokensPerSec = cluster.gpuCount * cluster.gpuUtilPercent * 0.08
@@ -228,10 +225,6 @@ export const VisionClusterInspector = ({ cluster }: VisionClusterInspectorProps)
                 <DescriptionListDescription>
                   {cluster.gpuCount}× {cluster.gpuType} · {cluster.gpuUtilPercent}% utilized
                 </DescriptionListDescription>
-              </DescriptionListGroup>
-              <DescriptionListGroup>
-                <DescriptionListTerm>Tenant</DescriptionListTerm>
-                <DescriptionListDescription>{org.label}</DescriptionListDescription>
               </DescriptionListGroup>
             </DescriptionList>
           </Tab>

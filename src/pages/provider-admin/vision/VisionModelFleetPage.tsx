@@ -12,14 +12,12 @@ import {
 import type { ProviderCatalogDraft } from '../../../providerSetup/storage'
 import { getVisionScenarioSeed } from '../../../vision/fleetScenarios'
 import {
-  clusterMatchesFilters,
   clustersForPreset,
   createClusterFromOffering,
   createDeploymentOnCluster,
   createInitialClusters,
   createInitialDeployments,
   createInitialPaths,
-  deploymentMatchesFilters,
   ensureServingPath,
   gatewaysForOrgFilter,
   getVisionOffering,
@@ -29,16 +27,13 @@ import {
   type VisionCluster,
   type VisionDeployment,
   type VisionGatewayId,
-  type VisionOrgId,
   type VisionServingPath,
   type VisionSiteId,
   VISION_MODEL_PRESETS,
 } from '../../../vision/fleetWorld'
 import { externalModelsForOrg } from '../../../vision/externalModelSeed'
 import { groupModelInstancesByModelId, servicesModelsForOrg } from '../../../vision/legacyModelInstanceSeed'
-import { catalogItemVisibleForTenant } from '../../../vision/visionCatalogRows'
 import {
-  CATALOG_OBJECT_TYPES,
   relatedClusterIdsForSelection,
   seedVisionDrawerSelection,
   SERVICES_OBJECT_TYPES,
@@ -59,13 +54,11 @@ import { VisionPlaceModelModal } from './VisionPlaceModelModal'
 type VisionModelFleetPageProps = {
   catalogItems: ProviderCatalogDraft[]
   onOpenCatalogPreset: (catalogItemId: string) => void
-  lockedOrgId?: VisionOrgId
 }
 
 export const VisionModelFleetPage = ({
   catalogItems,
   onOpenCatalogPreset,
-  lockedOrgId,
 }: VisionModelFleetPageProps) => {
   const [searchParams] = useSearchParams()
   const seed = getVisionScenarioSeed(searchParams)
@@ -77,9 +70,6 @@ export const VisionModelFleetPage = ({
   )
   const [paths, setPaths] = useState<VisionServingPath[]>(() =>
     seed.emptyGrid ? [] : createInitialPaths(),
-  )
-  const [orgFilter, setOrgFilter] = useState<VisionOrgId>(
-    lockedOrgId ?? (seed.orgFilter === 'all' ? 'nsb' : seed.orgFilter),
   )
   const [highlight, setHighlight] = useState<VisionDrawerSelection>(() =>
     seedVisionDrawerSelection(seed),
@@ -97,8 +87,8 @@ export const VisionModelFleetPage = ({
   const [modelFilter, setModelFilter] = useState('all')
 
   const orgFilteredClusters = useMemo(
-    () => clusters.filter((cluster) => clusterMatchesFilters(cluster, orgFilter, 'all')),
-    [clusters, orgFilter],
+    () => clusters,
+    [clusters],
   )
   const visibleClusters = useMemo(() => {
     if (modelFilter === 'all') return orgFilteredClusters
@@ -110,30 +100,27 @@ export const VisionModelFleetPage = ({
     return orgFilteredClusters.filter((c) => clusterIdsWithModel.has(c.id))
   }, [orgFilteredClusters, deployments, modelFilter])
   const visibleDeployments = useMemo(
-    () =>
-      deployments.filter((deployment) =>
-        deploymentMatchesFilters(deployment, orgFilter, 'all'),
-      ),
-    [deployments, orgFilter],
+    () => deployments,
+    [deployments],
   )
   const visibleCatalogItems = useMemo(
-    () => catalogItems.filter((item) => catalogItemVisibleForTenant(item, orgFilter)),
-    [catalogItems, orgFilter],
+    () => catalogItems,
+    [catalogItems],
   )
-  const visibleGateways = useMemo(() => gatewaysForOrgFilter(orgFilter), [orgFilter])
+  const visibleGateways = useMemo(() => gatewaysForOrgFilter('all'), [])
   const visibleOffPlatform = useMemo(
-    () => visibleOffPlatformModels(orgFilter),
-    [orgFilter],
+    () => visibleOffPlatformModels('all'),
+    [],
   )
   const summary = useMemo(() => {
     const fleet = summarizeFleet(visibleClusters, visibleDeployments, visibleOffPlatform)
-    const groupedModels = groupModelInstancesByModelId(servicesModelsForOrg(orgFilter)).length
-    const externalModels = externalModelsForOrg(orgFilter).length
+    const groupedModels = groupModelInstancesByModelId(servicesModelsForOrg('all')).length
+    const externalModels = externalModelsForOrg('all').length
     return {
       ...fleet,
       activeModels: groupedModels + externalModels,
     }
-  }, [visibleClusters, visibleDeployments, visibleOffPlatform, orgFilter])
+  }, [visibleClusters, visibleDeployments, visibleOffPlatform])
   const selectedCluster =
     detail.kind === 'cluster'
       ? (visibleClusters.find((cluster) => cluster.id === detail.clusterId) ??
@@ -184,13 +171,6 @@ export const VisionModelFleetPage = ({
     if (tab) {
       setDrawerTab(tab)
     }
-  }
-
-  const handleViewChange = (nextTab: VisionDrawerTab) => {
-    setDrawerTab(nextTab)
-    setDetail({ kind: 'none' })
-    setListSearch('')
-    setObjectTypes(nextTab === 'catalog' ? [...CATALOG_OBJECT_TYPES] : [...SERVICES_OBJECT_TYPES])
   }
 
   const showServicesType = (type: VisionGridObjectType) => {
@@ -253,10 +233,10 @@ export const VisionModelFleetPage = ({
       return
     }
 
-    const allowedGateways = gatewaysForOrgFilter(orgFilter)
+    const allowedGateways = gatewaysForOrgFilter('all')
     const gatewayId: VisionGatewayId = allowedGateways[0]?.id ?? 'nsb-retail'
 
-    const created = createClusterFromOffering(offering, siteId, orgFilter, gatewayId, clusters)
+    const created = createClusterFromOffering(offering, siteId, 'all', gatewayId, clusters)
     setClusters((current) => [...current, created])
     openDetails({ kind: 'cluster', clusterId: created.id }, 'services')
     setAddOfferingId(null)
@@ -265,11 +245,6 @@ export const VisionModelFleetPage = ({
   return (
     <div className="ai-grid-future-vision">
       <VisionGridFilters
-        orgFilter={orgFilter}
-        view={drawerTab}
-        onOrgChange={setOrgFilter}
-        onViewChange={handleViewChange}
-        showTenantFilter={!lockedOrgId}
         modelFilter={modelFilter}
         onModelFilterChange={setModelFilter}
         availableModels={VISION_MODEL_PRESETS}

@@ -173,11 +173,7 @@ export function ProviderAdminShell({
               <NavItem
                 key={item.id}
                 itemId={item.id}
-                isActive={
-                  activeNavId === item.id ||
-                  (activeNavId === 'provider-ai-model-catalog-settings' &&
-                    item.id === 'provider-ai-models')
-                }
+                isActive={activeNavId === item.id}
                 to="#"
                 preventDefault
               >

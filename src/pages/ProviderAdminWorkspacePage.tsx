@@ -13,7 +13,7 @@ import { ProviderAdminObservabilityPage } from './ProviderAdminObservabilityPage
 import { ProviderServiceSelectionPage } from './provider-setup/ProviderServiceSelectionPage'
 import TenantAdminModelsPage from './tenant-admin/ai/models/TenantAdminModelsPage'
 import { MaaSGovernancePage } from './tenant-admin/ai/maas-governance'
-import { ModelCatalogSettingsPage } from './tenant-admin/ai/model-catalog-settings'
+
 import { ProviderAdminGridEnrollmentPage } from './ProviderAdminGridEnrollmentPage'
 import { VisionModelFleetPage } from './provider-admin/vision/VisionModelFleetPage'
 import {
@@ -32,7 +32,6 @@ import {
 import {
   getProviderActiveNav,
   getProviderCatalogItems,
-  getProviderRegisteredOrganizations,
   getProviderSelectedServices,
   isProviderServicesSelected,
   isProviderSetupComplete,
@@ -43,12 +42,6 @@ import {
   setProviderSetupComplete,
 } from '../providerSetup/storage'
 import type { WorkspaceTransition } from '../providerAdmin/workspace'
-
-type ProviderModelsTab = 'catalog' | 'deployments'
-
-function isProviderModelsTab(value: string | null): value is ProviderModelsTab {
-  return value === 'catalog' || value === 'deployments'
-}
 
 function normalizeProviderNavParam(value: string | null): ProviderAdminNavId | null {
   const normalizedNav =
@@ -89,19 +82,11 @@ export function ProviderAdminWorkspacePage() {
   )
   const [workspaceTransition, setWorkspaceTransition] = useState<WorkspaceTransition>('idle')
   const [, setOpenCatalogItemKey] = useState<string | null>(null)
-  const [providerModelsInitialTab, setProviderModelsInitialTab] =
-    useState<ProviderModelsTab>('deployments')
   const [navContentKey, setNavContentKey] = useState(0)
   const catalogEditLeaveAttemptRef = useRef<((onConfirmed: () => void) => void) | null>(null)
 
   const navParam = searchParams.get('nav')
   const isModelDeploymentMvp = searchParams.get('navVersion') === 'model-deployment-mvp'
-  const requestedProviderModelsTab = searchParams.get('tab')
-  const initialProviderModelsTab: ProviderModelsTab =
-    isProviderModelsTab(requestedProviderModelsTab)
-      ? requestedProviderModelsTab
-      : providerModelsInitialTab
-
   useLayoutEffect(() => {
     const requestedNav = normalizeProviderNavParam(navParam)
     if (requestedNav) {
@@ -249,7 +234,6 @@ export function ProviderAdminWorkspacePage() {
       clearParams: [
         ...GENAI_API_KEYS_DETAIL_PARAMS,
         ...MAAS_GOVERNANCE_DETAIL_PARAMS,
-        ...(resolvedNavId === 'provider-ai-models' ? [] : ['tab']),
       ],
     })
   }
@@ -291,34 +275,7 @@ export function ProviderAdminWorkspacePage() {
       case 'ai-grid-enrollment':
         return <ProviderAdminGridEnrollmentPage />
       case 'provider-ai-models':
-        return (
-          <TenantAdminModelsPage
-            providerOrganizations={getProviderRegisteredOrganizations()}
-            initialTab={initialProviderModelsTab}
-            onTabChange={(tab) => {
-              setProviderModelsInitialTab(tab)
-              setSearchParams(
-                (current) => {
-                  const next = new URLSearchParams(current)
-                  next.set('tab', tab)
-                  return next
-                },
-                { replace: true },
-              )
-            }}
-            onManageSources={() => {
-              setProviderModelsInitialTab('catalog')
-              handleNavChange('provider-ai-model-catalog-settings')
-            }}
-          />
-        )
-      case 'provider-ai-model-catalog-settings':
-        return (
-          <ModelCatalogSettingsPage
-            isProviderAdmin
-            onBackToModels={() => handleNavChange('provider-ai-models')}
-          />
-        )
+        return <TenantAdminModelsPage />
       case 'provider-ai-maas-governance':
         return (
           <MaaSGovernancePage
