@@ -23,7 +23,6 @@ import {
   AreaChart,
   Bar,
   BarChart,
-  ComposedChart,
   Line,
   LineChart,
   ReferenceLine,
