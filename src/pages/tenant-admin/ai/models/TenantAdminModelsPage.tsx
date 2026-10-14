@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import {
+  Breadcrumb,
+  BreadcrumbItem,
   Button,
   Checkbox,
+  Content,
+  DescriptionList,
+  DescriptionListDescription,
+  DescriptionListGroup,
+  DescriptionListTerm,
   EmptyState,
   EmptyStateBody,
   Form,
@@ -9,10 +16,7 @@ import {
   FormSelect,
   FormSelectOption,
   Label,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
+  NumberInput,
   SearchInput,
   Stack,
   StackItem,
@@ -20,6 +24,8 @@ import {
   Toolbar,
   ToolbarContent,
   ToolbarItem,
+  Wizard,
+  WizardStep,
 } from '@patternfly/react-core'
 import {
   ExpandableRowContent,
@@ -33,7 +39,7 @@ import {
 import { GenaiPageStack } from '../../../tenant-user/genai/GenaiPageStack'
 import { TenantUserPageChrome } from '../../../tenant-user/genai/TenantUserPageChrome'
 
-type ModelStatus = 'Saved' | 'Registered'
+type ModelStatus = 'Deploying' | 'Available' | 'Failed'
 
 interface ModelDeployment {
   id: string
@@ -60,10 +66,10 @@ const AVAILABLE_LOCATIONS = [
   'us-central-1-dc-a',
 ]
 
-const RUNTIME_IMAGE_OPTIONS = [
-  'quay.io/modh/vllm:latest',
-  'quay.io/modh/tgis:latest',
-  'quay.io/modh/caikit-tgis:latest',
+const RUNTIME_OPTIONS: { value: string; label: string; image: string }[] = [
+  { value: 'vllm', label: 'vLLM', image: 'quay.io/modh/vllm:latest' },
+  { value: 'tgis', label: 'TGIS', image: 'quay.io/modh/tgis:latest' },
+  { value: 'caikit-tgis', label: 'Caikit+TGIS', image: 'quay.io/modh/caikit-tgis:latest' },
 ]
 
 const INITIAL_DEPLOYMENTS: ModelDeployment[] = [
@@ -81,7 +87,7 @@ const INITIAL_DEPLOYMENTS: ModelDeployment[] = [
     gpuCount: 1,
     runtimeArgs: ['--max-model-len=4096'],
     locations: ['us-west-1-dc-a', 'eu-west-1-dc-a'],
-    status: 'Registered',
+    status: 'Available',
     endpoint: 'https://granite-3b-instruct.apps.grid.example.com',
   },
   {
@@ -98,7 +104,7 @@ const INITIAL_DEPLOYMENTS: ModelDeployment[] = [
     gpuCount: 4,
     runtimeArgs: ['--max-model-len=8192', '--tensor-parallel-size=4'],
     locations: ['us-west-1-dc-a', 'us-east-1-dc-b'],
-    status: 'Registered',
+    status: 'Available',
     endpoint: 'https://llama-3-1-70b.apps.grid.example.com',
   },
   {
@@ -115,92 +121,48 @@ const INITIAL_DEPLOYMENTS: ModelDeployment[] = [
     gpuCount: 1,
     runtimeArgs: [],
     locations: ['us-east-1-dc-b'],
-    status: 'Saved',
+    status: 'Deploying',
     endpoint: '',
   },
 ]
 
-const StatusLabel = ({ status }: { status: ModelStatus }) => (
-  <Label
-    color={status === 'Registered' ? 'green' : 'blue'}
-    variant="outline"
-    isCompact
-  >
-    {status}
-  </Label>
-)
+const StatusLabel = ({ status }: { status: ModelStatus }) => {
+  const color = status === 'Available' ? 'green' : status === 'Deploying' ? 'blue' : 'red'
+  return (
+    <Label color={color} variant="outline" isCompact>
+      {status}
+    </Label>
+  )
+}
 
 type DeployFormState = {
   name: string
-  displayName: string
-  description: string
   modelUri: string
-  modelName: string
-  runtimeImage: string
-  replicas: string
-  cpu: string
-  memory: string
-  gpuCount: string
-  runtimeArgs: string
+  runtime: string
+  replicas: number
+  gpuCount: number
   locations: string[]
 }
 
 const EMPTY_FORM: DeployFormState = {
   name: '',
-  displayName: '',
-  description: '',
   modelUri: '',
-  modelName: '',
-  runtimeImage: 'quay.io/modh/vllm:latest',
-  replicas: '1',
-  cpu: '4',
-  memory: '16Gi',
-  gpuCount: '1',
-  runtimeArgs: '',
+  runtime: 'vllm',
+  replicas: 1,
+  gpuCount: 1,
   locations: [],
 }
 
-const TenantAdminModelsPage = () => {
-  const [deployments, setDeployments] = useState(INITIAL_DEPLOYMENTS)
-  const [searchValue, setSearchValue] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false)
+function DeployModelPage({ onDeploy, onCancel }: {
+  onDeploy: (deployment: ModelDeployment) => void
+  onCancel: () => void
+}) {
   const [form, setForm] = useState<DeployFormState>(EMPTY_FORM)
 
-  const visibleDeployments = deployments.filter((d) =>
-    d.name.toLocaleLowerCase().includes(searchValue.trim().toLocaleLowerCase()),
-  )
-
-  const isFormValid =
-    form.name.trim().length > 0 &&
-    form.modelUri.trim().length > 0 &&
-    form.locations.length > 0
-
-  const handleDeploy = () => {
-    const args = form.runtimeArgs.trim()
-      ? form.runtimeArgs.split(',').map((a) => a.trim()).filter(Boolean)
-      : []
-    const newDeployment: ModelDeployment = {
-      id: form.name.trim(),
-      name: form.name.trim(),
-      displayName: form.displayName.trim() || form.name.trim(),
-      description: form.description.trim(),
-      modelUri: form.modelUri.trim(),
-      modelName: form.modelName.trim() || form.name.trim(),
-      runtimeImage: form.runtimeImage,
-      replicas: parseInt(form.replicas, 10) || 1,
-      cpu: form.cpu.trim() || '4',
-      memory: form.memory.trim() || '16Gi',
-      gpuCount: parseInt(form.gpuCount, 10) || 1,
-      runtimeArgs: args,
-      locations: form.locations,
-      status: 'Registered',
-      endpoint: `https://${form.name.trim()}.apps.grid.example.com`,
-    }
-    setDeployments((current) => [newDeployment, ...current])
-    setForm(EMPTY_FORM)
-    setIsDeployModalOpen(false)
-  }
+  const isModelDetailsValid =
+    form.name.trim().length > 0 && form.modelUri.trim().length > 0
+  const isDeploymentValid = form.locations.length > 0
+  const runtimeOption = RUNTIME_OPTIONS.find((r) => r.value === form.runtime) ?? RUNTIME_OPTIONS[0]
 
   const toggleLocation = (loc: string) => {
     setForm((current) => ({
@@ -209,6 +171,247 @@ const TenantAdminModelsPage = () => {
         ? current.locations.filter((l) => l !== loc)
         : [...current.locations, loc],
     }))
+  }
+
+  const handleDeploy = () => {
+    const gpuCount = form.gpuCount
+    const cpuDefault = gpuCount >= 4 ? '8' : '4'
+    const memDefault = gpuCount >= 4 ? '64Gi' : '16Gi'
+    onDeploy({
+      id: form.name.trim(),
+      name: form.name.trim(),
+      displayName: form.name.trim().split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+      description: '',
+      modelUri: form.modelUri.trim(),
+      modelName: form.name.trim(),
+      runtimeImage: runtimeOption.image,
+      replicas: form.replicas,
+      cpu: cpuDefault,
+      memory: memDefault,
+      gpuCount,
+      runtimeArgs: [],
+      locations: form.locations,
+      status: 'Deploying',
+      endpoint: `https://${form.name.trim()}.apps.grid.example.com`,
+    })
+  }
+
+  return (
+    <div className="provider-admin-workspace-page">
+      <Breadcrumb className="pf-v6-u-mb-md">
+        <BreadcrumbItem
+          to="#"
+          onClick={(e) => { e.preventDefault(); onCancel() }}
+        >
+          Models
+        </BreadcrumbItem>
+        <BreadcrumbItem isActive>Deploy a model</BreadcrumbItem>
+      </Breadcrumb>
+
+      <Content component="h1" className="pf-v6-u-mb-xs">Deploy a model</Content>
+      <Content component="p" className="pf-v6-u-color-200 pf-v6-u-mb-lg">
+        Configure deployment options for this model version.
+      </Content>
+
+      <Wizard
+        isPlain
+        height="100%"
+      >
+        <WizardStep
+          name="Model details"
+          id="deploy-step-model-details"
+          footer={{ isNextDisabled: !isModelDetailsValid }}
+        >
+          <Content component="h3" className="pf-v6-u-mb-xs">Model details</Content>
+          <Content component="p" className="pf-v6-u-color-200 pf-v6-u-mb-lg">
+            Provide information about the model you want to deploy.
+          </Content>
+          <Form>
+            <FormGroup label="Name" isRequired fieldId="deploy-name">
+              <TextInput
+                id="deploy-name"
+                isRequired
+                value={form.name}
+                onChange={(_e, v) => setForm((f) => ({ ...f, name: v }))}
+                placeholder="e.g. granite-3b-instruct"
+              />
+            </FormGroup>
+            <FormGroup label="Model URI" isRequired fieldId="deploy-model-uri">
+              <TextInput
+                id="deploy-model-uri"
+                isRequired
+                value={form.modelUri}
+                onChange={(_e, v) => setForm((f) => ({ ...f, modelUri: v }))}
+                placeholder="oci://quay.io/modh/granite-3b-instruct"
+              />
+            </FormGroup>
+            <FormGroup label="Serving runtime" fieldId="deploy-runtime">
+              <FormSelect
+                id="deploy-runtime"
+                value={form.runtime}
+                onChange={(_e, v) => setForm((f) => ({ ...f, runtime: v }))}
+              >
+                {RUNTIME_OPTIONS.map((rt) => (
+                  <FormSelectOption key={rt.value} value={rt.value} label={rt.label} />
+                ))}
+              </FormSelect>
+            </FormGroup>
+          </Form>
+        </WizardStep>
+
+        <WizardStep
+          name="Model deployment"
+          id="deploy-step-deployment"
+        >
+          <Content component="h3" className="pf-v6-u-mb-xs">Model deployment</Content>
+          <Content component="p" className="pf-v6-u-color-200 pf-v6-u-mb-lg">
+            Configure replicas and GPU resources for this model.
+          </Content>
+          <Form>
+            <FormGroup label="Replica count" isRequired fieldId="deploy-replicas">
+              <NumberInput
+                id="deploy-replicas"
+                value={form.replicas}
+                min={1}
+                onMinus={() => setForm((f) => ({ ...f, replicas: Math.max(1, f.replicas - 1) }))}
+                onPlus={() => setForm((f) => ({ ...f, replicas: f.replicas + 1 }))}
+                onChange={(event) => {
+                  const val = parseInt((event.target as HTMLInputElement).value, 10)
+                  if (!isNaN(val) && val >= 1) setForm((f) => ({ ...f, replicas: val }))
+                }}
+                inputAriaLabel="Replica count"
+                minusBtnAriaLabel="Decrease replicas"
+                plusBtnAriaLabel="Increase replicas"
+              />
+            </FormGroup>
+            <FormGroup label="GPU count" isRequired fieldId="deploy-gpu">
+              <NumberInput
+                id="deploy-gpu"
+                value={form.gpuCount}
+                min={0}
+                onMinus={() => setForm((f) => ({ ...f, gpuCount: Math.max(0, f.gpuCount - 1) }))}
+                onPlus={() => setForm((f) => ({ ...f, gpuCount: f.gpuCount + 1 }))}
+                onChange={(event) => {
+                  const val = parseInt((event.target as HTMLInputElement).value, 10)
+                  if (!isNaN(val) && val >= 0) setForm((f) => ({ ...f, gpuCount: val }))
+                }}
+                inputAriaLabel="GPU count"
+                minusBtnAriaLabel="Decrease GPU count"
+                plusBtnAriaLabel="Increase GPU count"
+              />
+            </FormGroup>
+          </Form>
+        </WizardStep>
+
+        <WizardStep
+          name="Locations"
+          id="deploy-step-locations"
+          footer={{ isNextDisabled: !isDeploymentValid }}
+        >
+          <Content component="h3" className="pf-v6-u-mb-xs">Locations</Content>
+          <Content component="p" className="pf-v6-u-color-200 pf-v6-u-mb-lg">
+            Select which cluster locations this model should be deployed to via ACM placement.
+          </Content>
+          <Form>
+            <FormGroup
+              label="Target clusters"
+              isRequired
+              fieldId="deploy-locations"
+              role="group"
+            >
+              <Stack hasGutter>
+                {AVAILABLE_LOCATIONS.map((loc) => (
+                  <StackItem key={loc}>
+                    <Checkbox
+                      id={`deploy-loc-${loc}`}
+                      label={loc}
+                      isChecked={form.locations.includes(loc)}
+                      onChange={() => toggleLocation(loc)}
+                    />
+                  </StackItem>
+                ))}
+              </Stack>
+            </FormGroup>
+          </Form>
+        </WizardStep>
+
+        <WizardStep
+          name="Review"
+          id="deploy-step-review"
+          footer={{
+            nextButtonText: 'Deploy',
+            onNext: handleDeploy,
+            isNextDisabled: !isModelDetailsValid || !isDeploymentValid,
+          }}
+        >
+          <Content component="h3" className="pf-v6-u-mb-xs">Review</Content>
+          <Content component="p" className="pf-v6-u-color-200 pf-v6-u-mb-lg">
+            Review your model deployment configuration before deploying.
+          </Content>
+          <Stack hasGutter>
+            <StackItem>
+              <Content component="h4" className="pf-v6-u-mb-sm">Model details</Content>
+              <DescriptionList isCompact isHorizontal>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Name</DescriptionListTerm>
+                  <DescriptionListDescription>{form.name || '—'}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Model URI</DescriptionListTerm>
+                  <DescriptionListDescription>{form.modelUri || '—'}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Serving runtime</DescriptionListTerm>
+                  <DescriptionListDescription>{runtimeOption.label}</DescriptionListDescription>
+                </DescriptionListGroup>
+              </DescriptionList>
+            </StackItem>
+            <StackItem>
+              <Content component="h4" className="pf-v6-u-mb-sm">Model deployment</Content>
+              <DescriptionList isCompact isHorizontal>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Replicas</DescriptionListTerm>
+                  <DescriptionListDescription>{form.replicas}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>GPU count</DescriptionListTerm>
+                  <DescriptionListDescription>{form.gpuCount}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Locations</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    {form.locations.length > 0 ? form.locations.join(', ') : '—'}
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+              </DescriptionList>
+            </StackItem>
+          </Stack>
+        </WizardStep>
+      </Wizard>
+    </div>
+  )
+}
+
+const TenantAdminModelsPage = () => {
+  const [deployments, setDeployments] = useState(INITIAL_DEPLOYMENTS)
+  const [searchValue, setSearchValue] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [isDeployView, setIsDeployView] = useState(false)
+
+  const visibleDeployments = deployments.filter((d) =>
+    d.name.toLocaleLowerCase().includes(searchValue.trim().toLocaleLowerCase()),
+  )
+
+  if (isDeployView) {
+    return (
+      <DeployModelPage
+        onDeploy={(newDeployment) => {
+          setDeployments((current) => [newDeployment, ...current])
+          setIsDeployView(false)
+        }}
+        onCancel={() => setIsDeployView(false)}
+      />
+    )
   }
 
   return (
@@ -234,7 +437,7 @@ const TenantAdminModelsPage = () => {
             <ToolbarItem>
               <Button
                 variant="primary"
-                onClick={() => setIsDeployModalOpen(true)}
+                onClick={() => setIsDeployView(true)}
               >
                 Deploy model
               </Button>
@@ -248,9 +451,9 @@ const TenantAdminModelsPage = () => {
               <Tr>
                 <Th screenReaderText="Expand" />
                 <Th>Name</Th>
-                <Th>Runtime image</Th>
+                <Th>Serving runtime</Th>
                 <Th>Replicas</Th>
-                <Th>Resources</Th>
+                <Th>GPU</Th>
                 <Th>Locations</Th>
                 <Th>Status</Th>
               </Tr>
@@ -274,13 +477,11 @@ const TenantAdminModelsPage = () => {
                       <br />
                       <code style={{ fontSize: '0.85em' }}>{deployment.name}</code>
                     </Td>
-                    <Td dataLabel="Runtime image">
-                      <code style={{ fontSize: '0.85em' }}>{deployment.runtimeImage.split('/').pop()}</code>
+                    <Td dataLabel="Serving runtime">
+                      <code style={{ fontSize: '0.85em' }}>{deployment.runtimeImage.split('/').pop()?.replace(':latest', '')}</code>
                     </Td>
                     <Td dataLabel="Replicas">{deployment.replicas}</Td>
-                    <Td dataLabel="Resources">
-                      {deployment.gpuCount} GPU · {deployment.cpu} CPU · {deployment.memory}
-                    </Td>
+                    <Td dataLabel="GPU">{deployment.gpuCount}</Td>
                     <Td dataLabel="Locations">
                       {deployment.locations.map((loc) => (
                         <Label key={loc} isCompact color="blue" className="pf-v6-u-mr-xs pf-v6-u-mb-xs">
@@ -297,35 +498,42 @@ const TenantAdminModelsPage = () => {
                     <Td noPadding colSpan={7}>
                       <ExpandableRowContent>
                         <div className="pf-v6-u-p-md">
-                          <Stack hasGutter>
-                            {deployment.description && (
-                              <StackItem>{deployment.description}</StackItem>
-                            )}
-                            <StackItem>
-                              <strong>Model URI:</strong>{' '}
-                              <code>{deployment.modelUri}</code>
-                            </StackItem>
-                            <StackItem>
-                              <strong>Model name:</strong>{' '}
-                              <code>{deployment.modelName}</code>
-                            </StackItem>
-                            <StackItem>
-                              <strong>Runtime image:</strong>{' '}
-                              <code>{deployment.runtimeImage}</code>
-                            </StackItem>
+                          <DescriptionList isCompact isHorizontal>
+                            <DescriptionListGroup>
+                              <DescriptionListTerm>Model URI</DescriptionListTerm>
+                              <DescriptionListDescription>
+                                <code>{deployment.modelUri}</code>
+                              </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                              <DescriptionListTerm>Runtime image</DescriptionListTerm>
+                              <DescriptionListDescription>
+                                <code>{deployment.runtimeImage}</code>
+                              </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                              <DescriptionListTerm>Resources</DescriptionListTerm>
+                              <DescriptionListDescription>
+                                {deployment.gpuCount} GPU · {deployment.cpu} CPU · {deployment.memory}
+                              </DescriptionListDescription>
+                            </DescriptionListGroup>
                             {deployment.endpoint && (
-                              <StackItem>
-                                <strong>Inference endpoint:</strong>{' '}
-                                <code>{deployment.endpoint}</code>
-                              </StackItem>
+                              <DescriptionListGroup>
+                                <DescriptionListTerm>Inference endpoint</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                  <code>{deployment.endpoint}</code>
+                                </DescriptionListDescription>
+                              </DescriptionListGroup>
                             )}
                             {deployment.runtimeArgs.length > 0 && (
-                              <StackItem>
-                                <strong>Runtime args:</strong>{' '}
-                                <code>{deployment.runtimeArgs.join(' ')}</code>
-                              </StackItem>
+                              <DescriptionListGroup>
+                                <DescriptionListTerm>Runtime args</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                  <code>{deployment.runtimeArgs.join(' ')}</code>
+                                </DescriptionListDescription>
+                              </DescriptionListGroup>
                             )}
-                          </Stack>
+                          </DescriptionList>
                         </div>
                       </ExpandableRowContent>
                     </Td>
@@ -351,151 +559,6 @@ const TenantAdminModelsPage = () => {
           </EmptyState>
         )}
       </GenaiPageStack>
-
-      <Modal
-        isOpen={isDeployModalOpen}
-        onClose={() => {
-          setIsDeployModalOpen(false)
-          setForm(EMPTY_FORM)
-        }}
-        variant="medium"
-      >
-        <ModalHeader title="Deploy model" />
-        <ModalBody>
-          <Form isHorizontal>
-            <FormGroup label="Name" isRequired fieldId="deploy-name">
-              <TextInput
-                id="deploy-name"
-                isRequired
-                value={form.name}
-                onChange={(_e, v) => setForm((f) => ({ ...f, name: v }))}
-                placeholder="e.g. granite-3b-instruct"
-              />
-            </FormGroup>
-            <FormGroup label="Display name" fieldId="deploy-display-name">
-              <TextInput
-                id="deploy-display-name"
-                value={form.displayName}
-                onChange={(_e, v) => setForm((f) => ({ ...f, displayName: v }))}
-                placeholder="e.g. Granite 3B Instruct"
-              />
-            </FormGroup>
-            <FormGroup label="Description" fieldId="deploy-description">
-              <TextInput
-                id="deploy-description"
-                value={form.description}
-                onChange={(_e, v) => setForm((f) => ({ ...f, description: v }))}
-                placeholder="Brief description of this model deployment"
-              />
-            </FormGroup>
-            <FormGroup label="Model URI" isRequired fieldId="deploy-model-uri">
-              <TextInput
-                id="deploy-model-uri"
-                isRequired
-                value={form.modelUri}
-                onChange={(_e, v) => setForm((f) => ({ ...f, modelUri: v }))}
-                placeholder="oci://quay.io/modh/granite-3b-instruct"
-              />
-            </FormGroup>
-            <FormGroup label="Model name" fieldId="deploy-model-name">
-              <TextInput
-                id="deploy-model-name"
-                value={form.modelName}
-                onChange={(_e, v) => setForm((f) => ({ ...f, modelName: v }))}
-                placeholder="e.g. granite-3b-instruct (defaults to name)"
-              />
-            </FormGroup>
-            <FormGroup label="Runtime image" fieldId="deploy-runtime-image">
-              <FormSelect
-                id="deploy-runtime-image"
-                value={form.runtimeImage}
-                onChange={(_e, v) => setForm((f) => ({ ...f, runtimeImage: v }))}
-              >
-                {RUNTIME_IMAGE_OPTIONS.map((img) => (
-                  <FormSelectOption key={img} value={img} label={img} />
-                ))}
-              </FormSelect>
-            </FormGroup>
-            <FormGroup label="Replicas" fieldId="deploy-replicas">
-              <TextInput
-                id="deploy-replicas"
-                type="number"
-                value={form.replicas}
-                onChange={(_e, v) => setForm((f) => ({ ...f, replicas: v }))}
-                min={1}
-              />
-            </FormGroup>
-            <FormGroup label="CPU" fieldId="deploy-cpu">
-              <TextInput
-                id="deploy-cpu"
-                value={form.cpu}
-                onChange={(_e, v) => setForm((f) => ({ ...f, cpu: v }))}
-                placeholder="4"
-              />
-            </FormGroup>
-            <FormGroup label="Memory" fieldId="deploy-memory">
-              <TextInput
-                id="deploy-memory"
-                value={form.memory}
-                onChange={(_e, v) => setForm((f) => ({ ...f, memory: v }))}
-                placeholder="16Gi"
-              />
-            </FormGroup>
-            <FormGroup label="GPU count" fieldId="deploy-gpu">
-              <TextInput
-                id="deploy-gpu"
-                type="number"
-                value={form.gpuCount}
-                onChange={(_e, v) => setForm((f) => ({ ...f, gpuCount: v }))}
-                min={0}
-              />
-            </FormGroup>
-            <FormGroup label="Runtime arguments" fieldId="deploy-runtime-args">
-              <TextInput
-                id="deploy-runtime-args"
-                value={form.runtimeArgs}
-                onChange={(_e, v) => setForm((f) => ({ ...f, runtimeArgs: v }))}
-                placeholder="--max-model-len=4096, --tensor-parallel-size=2"
-              />
-            </FormGroup>
-            <FormGroup
-              label="Locations"
-              isRequired
-              fieldId="deploy-locations"
-              role="group"
-            >
-              {AVAILABLE_LOCATIONS.map((loc) => (
-                <Checkbox
-                  key={loc}
-                  id={`deploy-loc-${loc}`}
-                  label={loc}
-                  isChecked={form.locations.includes(loc)}
-                  onChange={() => toggleLocation(loc)}
-                  className="pf-v6-u-mb-xs"
-                />
-              ))}
-            </FormGroup>
-          </Form>
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            variant="primary"
-            isDisabled={!isFormValid}
-            onClick={handleDeploy}
-          >
-            Deploy
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => {
-              setIsDeployModalOpen(false)
-              setForm(EMPTY_FORM)
-            }}
-          >
-            Cancel
-          </Button>
-        </ModalFooter>
-      </Modal>
     </TenantUserPageChrome>
   )
 }

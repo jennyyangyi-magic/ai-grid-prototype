@@ -66,11 +66,11 @@ export function ProviderAdminShell({
 
   const AI_GRID_FLAT_NAV: { id: ProviderAdminNavId; label: string }[] = [
     { id: 'ai-grid', label: 'AI Grid' },
-    { id: 'ai-grid-enrollment', label: 'Grid enrollment' },
+    { id: 'ai-grid-enrollment', label: 'Clusters' },
+    { id: 'administration-organizations', label: 'Tenants' },
     { id: 'provider-ai-models', label: 'Models' },
     { id: 'provider-ai-maas-governance', label: 'MaaS governance' },
     { id: 'provider-ai-observability', label: 'Observability' },
-    { id: 'administration-organizations', label: 'Tenants' },
   ]
 
   const header = (

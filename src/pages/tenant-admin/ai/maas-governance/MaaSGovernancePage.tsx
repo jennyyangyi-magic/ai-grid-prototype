@@ -2,12 +2,15 @@ import React from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Badge,
+  Breadcrumb,
+  BreadcrumbItem,
   Button,
   Card,
   CardBody,
   CardExpandableContent,
   CardHeader,
   Checkbox,
+  Content,
   DescriptionList,
   DescriptionListDescription,
   DescriptionListGroup,
@@ -25,12 +28,15 @@ import {
   ModalFooter,
   ModalHeader,
   ModalVariant,
+  NumberInput,
   Pagination,
   Popover,
   SearchInput,
   Select,
   SelectList,
   SelectOption,
+  Stack,
+  StackItem,
   Tab,
   TabTitleText,
   Tabs,
@@ -73,6 +79,9 @@ import { useVisionOrgFilter } from '../../../../vision/useVisionOrgFilter';
 
 
 import {
+  addAuthPolicyToStore,
+  addSubscriptionToStore,
+  availableGroups,
   computeGovernanceGroups,
   computeGovernanceModels,
   deleteAuthPolicyFromStore,
@@ -91,6 +100,7 @@ import type {
   PhaseStatus,
   SubscriptionListItem,
   SubscriptionRef,
+  TokenRateLimit,
 } from './mockData';
 import {
   PhasePopoverLabel,
@@ -193,6 +203,577 @@ const TruncatedDescription: React.FC<{ text: string; id: string }> = ({ text, id
   if (!isTruncated) {return content;}
   return <Tooltip content={text} id={`${id}-desc-tip`}>{content}</Tooltip>;
 };
+
+// ---------------------------------------------------------------------------
+// Create Subscription Form (matches odh-dashboard pattern: single-page form
+// with Name/Description, Priority, Groups, Models with per-model rate limits,
+// and optional "Create authorization policy" checkbox)
+// ---------------------------------------------------------------------------
+
+type RateLimitEntry = {
+  count: number
+  time: number
+  unit: 'hour' | 'minute' | 'second'
+}
+
+const DEFAULT_RATE_LIMIT: RateLimitEntry = { count: 10000, time: 1, unit: 'hour' }
+
+const UNIT_OPTIONS: { value: RateLimitEntry['unit']; label: string }[] = [
+  { value: 'hour', label: 'hour' },
+  { value: 'minute', label: 'minute' },
+  { value: 'second', label: 'second' },
+]
+
+function RateLimitRow({
+  id,
+  rateLimit,
+  onChange,
+  onRemove,
+  showRemove,
+}: {
+  id: string
+  rateLimit: RateLimitEntry
+  onChange: (rl: RateLimitEntry) => void
+  onRemove?: () => void
+  showRemove: boolean
+}) {
+  const [unitOpen, setUnitOpen] = React.useState(false)
+  const unitLabel = UNIT_OPTIONS.find((o) => o.value === rateLimit.unit)?.label ?? rateLimit.unit
+
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <NumberInput
+        id={`${id}-count`}
+        value={rateLimit.count}
+        min={1}
+        onMinus={() => onChange({ ...rateLimit, count: Math.max(1, rateLimit.count - 1000) })}
+        onPlus={() => onChange({ ...rateLimit, count: rateLimit.count + 1000 })}
+        onChange={(event) => {
+          const val = parseInt((event.target as HTMLInputElement).value, 10)
+          if (!isNaN(val) && val >= 1) onChange({ ...rateLimit, count: val })
+        }}
+        inputAriaLabel="Token count"
+        minusBtnAriaLabel="Decrease count"
+        plusBtnAriaLabel="Increase count"
+      />
+      <span>tokens per</span>
+      <NumberInput
+        id={`${id}-time`}
+        value={rateLimit.time}
+        min={1}
+        onMinus={() => onChange({ ...rateLimit, time: Math.max(1, rateLimit.time - 1) })}
+        onPlus={() => onChange({ ...rateLimit, time: rateLimit.time + 1 })}
+        onChange={(event) => {
+          const val = parseInt((event.target as HTMLInputElement).value, 10)
+          if (!isNaN(val) && val >= 1) onChange({ ...rateLimit, time: val })
+        }}
+        inputAriaLabel="Time value"
+        minusBtnAriaLabel="Decrease time"
+        plusBtnAriaLabel="Increase time"
+      />
+      <Select
+        id={`${id}-unit`}
+        isOpen={unitOpen}
+        selected={rateLimit.unit}
+        onSelect={(_event, value) => {
+          onChange({ ...rateLimit, unit: value as RateLimitEntry['unit'] })
+          setUnitOpen(false)
+        }}
+        onOpenChange={setUnitOpen}
+        toggle={(toggleRef) => (
+          <MenuToggle
+            ref={toggleRef}
+            onClick={() => setUnitOpen((o) => !o)}
+            isExpanded={unitOpen}
+            style={{ minWidth: 100 }}
+          >
+            {unitLabel}
+          </MenuToggle>
+        )}
+      >
+        <SelectList>
+          {UNIT_OPTIONS.map((opt) => (
+            <SelectOption key={opt.value} value={opt.value}>{opt.label}</SelectOption>
+          ))}
+        </SelectList>
+      </Select>
+      {showRemove && (
+        <Button variant="plain" aria-label="Remove rate limit" onClick={onRemove}>
+          &times;
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function EditRateLimitsModal({
+  modelName,
+  rateLimits,
+  onSave,
+  onClose,
+}: {
+  modelName: string
+  rateLimits: RateLimitEntry[]
+  onSave: (limits: RateLimitEntry[]) => void
+  onClose: () => void
+}) {
+  const [localLimits, setLocalLimits] = React.useState<RateLimitEntry[]>(
+    () => rateLimits.length > 0 ? [...rateLimits] : [{ ...DEFAULT_RATE_LIMIT }],
+  )
+
+  return (
+    <Modal isOpen onClose={onClose} variant="medium">
+      <ModalHeader
+        title="Edit subscription token limits"
+        description={<>Set limits on the number of tokens that can be consumed per member for <strong>{modelName}</strong>.</>}
+      />
+      <ModalBody>
+        <Stack hasGutter>
+          {localLimits.map((limit, index) => (
+            <StackItem key={index}>
+              <RateLimitRow
+                id={`edit-rl-${index}`}
+                rateLimit={limit}
+                onChange={(updated) => setLocalLimits((prev) => prev.map((l, i) => i === index ? updated : l))}
+                onRemove={() => setLocalLimits((prev) => prev.filter((_, i) => i !== index))}
+                showRemove={localLimits.length > 1}
+              />
+            </StackItem>
+          ))}
+          <StackItem>
+            <Button
+              variant="link"
+              onClick={() => setLocalLimits((prev) => [...prev, { ...DEFAULT_RATE_LIMIT }])}
+            >
+              + Add token rate limit
+            </Button>
+          </StackItem>
+        </Stack>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="primary" onClick={() => onSave(localLimits)}>Save</Button>
+        <Button variant="link" onClick={onClose}>Cancel</Button>
+      </ModalFooter>
+    </Modal>
+  )
+}
+
+function CreateSubscriptionWizard({
+  governanceModels,
+  prefillModel,
+  prefillGroup,
+  isModelDeploymentMvp,
+  onSubmit,
+  onCancel,
+}: {
+  governanceModels: GovernanceModel[]
+  prefillModel: string | null
+  prefillGroup: string | null
+  isModelDeploymentMvp: boolean
+  onSubmit: () => void
+  onCancel: () => void
+}) {
+  const [name, setName] = React.useState('')
+  const [description, setDescription] = React.useState('')
+  const [priority, setPriority] = React.useState(0)
+  const [selectedGroups, setSelectedGroups] = React.useState<string[]>(
+    () => prefillGroup ? [prefillGroup] : [],
+  )
+  const [selectedModels, setSelectedModels] = React.useState<string[]>(
+    () => prefillModel ? [prefillModel] : [],
+  )
+  const [modelRateLimits, setModelRateLimits] = React.useState<Record<string, RateLimitEntry[]>>({})
+  const [editLimitsModelId, setEditLimitsModelId] = React.useState<string | null>(null)
+  const [createAuthPolicyChecked, setCreateAuthPolicyChecked] = React.useState(true)
+
+  const isNameValid = name.trim().length > 0
+  const hasGroups = selectedGroups.length > 0
+  const hasModels = selectedModels.length > 0
+  const canSubmit = isNameValid && hasGroups && hasModels
+
+  const toggleGroup = (group: string) => {
+    setSelectedGroups((prev) =>
+      prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group],
+    )
+  }
+
+  const toggleModel = (modelId: string) => {
+    setSelectedModels((prev) =>
+      prev.includes(modelId) ? prev.filter((m) => m !== modelId) : [...prev, modelId],
+    )
+  }
+
+  const handleCreate = () => {
+    const now = new Date()
+    const resourceName = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    const tokenLimits: Record<string, TokenRateLimit[]> = {}
+    for (const modelId of selectedModels) {
+      const limits = modelRateLimits[modelId] ?? [{ ...DEFAULT_RATE_LIMIT }]
+      tokenLimits[modelId] = limits.map((l) => ({
+        tokens: l.count,
+        per: l.time,
+        unit: l.unit === 'second' ? 'minute' : l.unit,
+      }))
+    }
+    const sub: SubscriptionListItem = {
+      id: `sub-${Date.now()}`,
+      name: name.trim(),
+      resourceName,
+      description: description.trim(),
+      phase: 'Active',
+      priority,
+      groups: selectedGroups,
+      models: selectedModels,
+      tokenLimits,
+      dateCreated: now,
+      lastModified: now,
+    }
+    addSubscriptionToStore(sub, isModelDeploymentMvp)
+    if (createAuthPolicyChecked) {
+      const pol: AuthPolicyListItem = {
+        id: `pol-${Date.now()}`,
+        name: `${name.trim()} policy`,
+        resourceName: `${resourceName}-policy`,
+        description: `Auto-created authorization policy for ${name.trim()}.`,
+        phase: 'Active',
+        groups: selectedGroups,
+        models: selectedModels,
+        dateCreated: now,
+        lastModified: now,
+      }
+      addAuthPolicyToStore(pol, isModelDeploymentMvp)
+    }
+    onSubmit()
+  }
+
+  const editLimitsModel = editLimitsModelId
+    ? governanceModels.find((m) => m.identityId === editLimitsModelId)
+    : null
+
+  return (
+    <div className="provider-admin-workspace-page">
+      <Breadcrumb className="pf-v6-u-mb-md">
+        <BreadcrumbItem to="#" onClick={(e) => { e.preventDefault(); onCancel() }}>
+          MaaS governance
+        </BreadcrumbItem>
+        <BreadcrumbItem isActive>Create subscription</BreadcrumbItem>
+      </Breadcrumb>
+
+      <Content component="h1" className="pf-v6-u-mb-lg">Create subscription</Content>
+
+      <Form maxWidth="750px">
+        <FormGroup label="Name" isRequired fieldId="sub-name">
+          <TextInput
+            id="sub-name"
+            isRequired
+            value={name}
+            onChange={(_e, v) => setName(v)}
+            placeholder="e.g. data-science-granite-access"
+          />
+        </FormGroup>
+        <FormGroup label="Description" fieldId="sub-description">
+          <TextInput
+            id="sub-description"
+            value={description}
+            onChange={(_e, v) => setDescription(v)}
+            placeholder="Optional description of this subscription"
+          />
+        </FormGroup>
+        <FormGroup label="Priority" isRequired fieldId="sub-priority">
+          <Content component="small" className="pf-v6-u-mb-xs pf-v6-u-color-200">
+            Higher numbers indicate higher priority.
+          </Content>
+          <NumberInput
+            id="sub-priority"
+            value={priority}
+            onMinus={() => setPriority((p) => p - 1)}
+            onPlus={() => setPriority((p) => p + 1)}
+            onChange={(event) => {
+              const val = parseInt((event.target as HTMLInputElement).value, 10)
+              if (!isNaN(val)) setPriority(val)
+            }}
+            inputAriaLabel="Priority"
+            minusBtnAriaLabel="Decrease priority"
+            plusBtnAriaLabel="Increase priority"
+          />
+        </FormGroup>
+
+        <FormGroup label="Groups" isRequired fieldId="sub-groups">
+          <Content component="small" className="pf-v6-u-mb-xs pf-v6-u-color-200">
+            Select user groups that can access models in this subscription.
+          </Content>
+          <Stack hasGutter>
+            {availableGroups.map((group) => (
+              <StackItem key={group}>
+                <Checkbox
+                  id={`sub-group-${group}`}
+                  label={group}
+                  isChecked={selectedGroups.includes(group)}
+                  onChange={() => toggleGroup(group)}
+                />
+              </StackItem>
+            ))}
+          </Stack>
+        </FormGroup>
+
+        <FormGroup label="Models" isRequired fieldId="sub-models">
+          <Content component="small" className="pf-v6-u-mb-xs pf-v6-u-color-200">
+            Select models for this subscription. Click "Edit limits" to set per-model token rate limits.
+          </Content>
+          <Table aria-label="Subscription models" variant="compact">
+            <Thead>
+              <Tr>
+                <Th />
+                <Th>Model</Th>
+                <Th>Token rate limits</Th>
+                <Th />
+              </Tr>
+            </Thead>
+            <Tbody>
+              {governanceModels.map((model) => {
+                const isSelected = selectedModels.includes(model.identityId)
+                const limits = modelRateLimits[model.identityId]
+                const limitsLabel = limits && limits.length > 0
+                  ? limits.map((l) => `${l.count.toLocaleString()} per ${l.time > 1 ? `${l.time} ` : ''}${l.unit}`).join(', ')
+                  : 'Not set'
+
+                return (
+                  <Tr key={model.identityId}>
+                    <Td>
+                      <Checkbox
+                        id={`sub-model-${model.identityId}`}
+                        isChecked={isSelected}
+                        onChange={() => toggleModel(model.identityId)}
+                        aria-label={`Select ${model.name}`}
+                      />
+                    </Td>
+                    <Td>
+                      <strong>{model.name}</strong>
+                      <Content component="small" className="pf-v6-u-color-200">{model.modelId}</Content>
+                    </Td>
+                    <Td>{isSelected ? limitsLabel : '—'}</Td>
+                    <Td>
+                      {isSelected && (
+                        <Button
+                          variant="link"
+                          isInline
+                          onClick={() => setEditLimitsModelId(model.identityId)}
+                        >
+                          Edit limits
+                        </Button>
+                      )}
+                    </Td>
+                  </Tr>
+                )
+              })}
+            </Tbody>
+          </Table>
+        </FormGroup>
+
+        <FormGroup label="Authorization policy" fieldId="sub-create-auth-policy">
+          <Content component="small" className="pf-v6-u-mb-xs pf-v6-u-color-200">
+            To consume model endpoints through the API gateway, users must have both a subscription and an authorization policy.
+          </Content>
+          <Checkbox
+            id="sub-create-auth-policy"
+            label="Create authorization policy"
+            isChecked={createAuthPolicyChecked}
+            onChange={(_e, checked) => setCreateAuthPolicyChecked(checked)}
+          />
+        </FormGroup>
+
+        <div className="pf-v6-u-mt-md" style={{ display: 'flex', gap: 16 }}>
+          <Button
+            variant="primary"
+            onClick={handleCreate}
+            isDisabled={!canSubmit}
+          >
+            Create subscription
+          </Button>
+          <Button variant="link" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </Form>
+
+      {editLimitsModelId && editLimitsModel && (
+        <EditRateLimitsModal
+          modelName={editLimitsModel.name}
+          rateLimits={modelRateLimits[editLimitsModelId] ?? []}
+          onSave={(limits) => {
+            setModelRateLimits((prev) => ({ ...prev, [editLimitsModelId]: limits }))
+            setEditLimitsModelId(null)
+          }}
+          onClose={() => setEditLimitsModelId(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Create Auth Policy Form (matches odh-dashboard pattern: single-page form
+// with Name/Description, Groups, Models — no rate limits)
+// ---------------------------------------------------------------------------
+
+function CreateAuthPolicyWizard({
+  governanceModels,
+  prefillModel,
+  prefillGroup,
+  isModelDeploymentMvp,
+  onSubmit,
+  onCancel,
+}: {
+  governanceModels: GovernanceModel[]
+  prefillModel: string | null
+  prefillGroup: string | null
+  isModelDeploymentMvp: boolean
+  onSubmit: () => void
+  onCancel: () => void
+}) {
+  const [name, setName] = React.useState('')
+  const [description, setDescription] = React.useState('')
+  const [selectedGroups, setSelectedGroups] = React.useState<string[]>(
+    () => prefillGroup ? [prefillGroup] : [],
+  )
+  const [selectedModels, setSelectedModels] = React.useState<string[]>(
+    () => prefillModel ? [prefillModel] : [],
+  )
+
+  const isNameValid = name.trim().length > 0
+  const hasGroups = selectedGroups.length > 0
+  const hasModels = selectedModels.length > 0
+  const canSubmit = isNameValid && hasGroups && hasModels
+
+  const toggleGroup = (group: string) => {
+    setSelectedGroups((prev) =>
+      prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group],
+    )
+  }
+
+  const toggleModel = (modelId: string) => {
+    setSelectedModels((prev) =>
+      prev.includes(modelId) ? prev.filter((m) => m !== modelId) : [...prev, modelId],
+    )
+  }
+
+  const handleCreate = () => {
+    const now = new Date()
+    const resourceName = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    const pol: AuthPolicyListItem = {
+      id: `pol-${Date.now()}`,
+      name: name.trim(),
+      resourceName,
+      description: description.trim(),
+      phase: 'Active',
+      groups: selectedGroups,
+      models: selectedModels,
+      dateCreated: now,
+      lastModified: now,
+    }
+    addAuthPolicyToStore(pol, isModelDeploymentMvp)
+    onSubmit()
+  }
+
+  return (
+    <div className="provider-admin-workspace-page">
+      <Breadcrumb className="pf-v6-u-mb-md">
+        <BreadcrumbItem to="#" onClick={(e) => { e.preventDefault(); onCancel() }}>
+          MaaS governance
+        </BreadcrumbItem>
+        <BreadcrumbItem isActive>Create authorization policy</BreadcrumbItem>
+      </Breadcrumb>
+
+      <Content component="h1" className="pf-v6-u-mb-xs">Create authorization policy</Content>
+      <Content component="p" className="pf-v6-u-color-200 pf-v6-u-mb-lg">
+        Create a new authorization policy to control which groups can access AI model endpoints.
+      </Content>
+
+      <Form maxWidth="750px">
+        <FormGroup label="Name" isRequired fieldId="pol-name">
+          <TextInput
+            id="pol-name"
+            isRequired
+            value={name}
+            onChange={(_e, v) => setName(v)}
+            placeholder="e.g. nsb-platform-access"
+          />
+        </FormGroup>
+        <FormGroup label="Description" fieldId="pol-description">
+          <TextInput
+            id="pol-description"
+            value={description}
+            onChange={(_e, v) => setDescription(v)}
+            placeholder="Optional description"
+          />
+        </FormGroup>
+
+        <FormGroup label="Groups" isRequired fieldId="pol-groups">
+          <Content component="small" className="pf-v6-u-mb-xs pf-v6-u-color-200">
+            Select user groups that can access models in this authorization policy.
+          </Content>
+          <Stack hasGutter>
+            {availableGroups.map((group) => (
+              <StackItem key={group}>
+                <Checkbox
+                  id={`pol-group-${group}`}
+                  label={group}
+                  isChecked={selectedGroups.includes(group)}
+                  onChange={() => toggleGroup(group)}
+                />
+              </StackItem>
+            ))}
+          </Stack>
+        </FormGroup>
+
+        <FormGroup label="Models" isRequired fieldId="pol-models">
+          <Content component="small" className="pf-v6-u-mb-xs pf-v6-u-color-200">
+            Add models that subjects of this authorization policy will be granted access to.
+          </Content>
+          <Table aria-label="Policy models" variant="compact">
+            <Thead>
+              <Tr>
+                <Th />
+                <Th>Model</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {governanceModels.map((model) => (
+                <Tr key={model.identityId}>
+                  <Td>
+                    <Checkbox
+                      id={`pol-model-${model.identityId}`}
+                      isChecked={selectedModels.includes(model.identityId)}
+                      onChange={() => toggleModel(model.identityId)}
+                      aria-label={`Select ${model.name}`}
+                    />
+                  </Td>
+                  <Td>
+                    <strong>{model.name}</strong>
+                    <Content component="small" className="pf-v6-u-color-200">{model.modelId}</Content>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </FormGroup>
+
+        <div className="pf-v6-u-mt-md" style={{ display: 'flex', gap: 16 }}>
+          <Button
+            variant="primary"
+            onClick={handleCreate}
+            isDisabled={!canSubmit}
+          >
+            Create authorization policy
+          </Button>
+          <Button variant="link" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </Form>
+    </div>
+  )
+}
 
 const OVERVIEW_COL_COUNT = 7;
 const SUB_COL_COUNT = 6;
@@ -2028,35 +2609,59 @@ const MaaSGovernancePage = ({
   const maasSubId = searchParams.get('maasSubId')
   const maasPolId = searchParams.get('maasPolId')
 
-  if (maasWizard || maasSubId || maasPolId) {
-    const stubTitle = maasWizard
-      ? maasWizard === 'create-subscription'
-        ? 'Create subscription'
-        : 'Create authorization policy'
-      : maasSubId
-        ? 'Subscription details'
-        : 'Authorization policy details'
+  const clearWizardParams = () =>
+    goMaas({
+      maasWizard: null,
+      maasSubId: null,
+      maasPolId: null,
+      edit: null,
+      prefillModel: null,
+      prefillGroup: null,
+      from: null,
+    })
+
+  if (maasWizard === 'create-subscription') {
+    const prefillModel = searchParams.get('prefillModel')
+    const prefillGroup = searchParams.get('prefillGroup')
+    return (
+      <CreateSubscriptionWizard
+        governanceModels={governanceModels}
+        prefillModel={prefillModel}
+        prefillGroup={prefillGroup}
+        isModelDeploymentMvp={isModelDeploymentMvp}
+        onSubmit={() => { refreshData(); clearWizardParams() }}
+        onCancel={clearWizardParams}
+      />
+    )
+  }
+
+  if (maasWizard === 'create-auth-policy') {
+    const prefillModel = searchParams.get('prefillModel')
+    const prefillGroup = searchParams.get('prefillGroup')
+    return (
+      <CreateAuthPolicyWizard
+        governanceModels={governanceModels}
+        prefillModel={prefillModel}
+        prefillGroup={prefillGroup}
+        isModelDeploymentMvp={isModelDeploymentMvp}
+        onSubmit={() => { refreshData(); clearWizardParams() }}
+        onCancel={clearWizardParams}
+      />
+    )
+  }
+
+  if (maasSubId || maasPolId) {
+    const stubTitle = maasSubId
+      ? 'Subscription details'
+      : 'Authorization policy details'
     return (
       <TenantUserPageChrome
         pageClassName={`${surface}-maas-governance`}
         kicker="AI"
         title={stubTitle}
-        description="This admin flow is stubbed in the Ethan prototype. Use the breadcrumb-style back control to return to MaaS governance."
+        description="This detail view is stubbed in the prototype. Use the back control to return to MaaS governance."
         actions={
-          <Button
-            variant="secondary"
-            onClick={() =>
-              goMaas({
-                maasWizard: null,
-                maasSubId: null,
-                maasPolId: null,
-                edit: null,
-                prefillModel: null,
-                prefillGroup: null,
-                from: null,
-              })
-            }
-          >
+          <Button variant="secondary" onClick={clearWizardParams}>
             Back to MaaS governance
           </Button>
         }

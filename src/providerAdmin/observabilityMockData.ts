@@ -17,6 +17,7 @@ export type FleetHealthSummary = {
   requestsPerMin: number
   p99LatencyMs: number
   queueDepth: number
+  deployedModels: number
 }
 
 export const MOCK_FLEET_HEALTH: FleetHealthSummary = {
@@ -27,6 +28,7 @@ export const MOCK_FLEET_HEALTH: FleetHealthSummary = {
   requestsPerMin: 312,
   p99LatencyMs: 180,
   queueDepth: 18,
+  deployedModels: 10,
 }
 
 export const MOCK_TENANT_USAGE: TenantUsageRow[] = [

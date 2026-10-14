@@ -213,8 +213,8 @@ export function ProviderAdminGridEnrollmentPage() {
   return (
     <div className="provider-admin-workspace-page">
       <ProviderAdminWorkspacePageHeader
-        title="Grid enrollment"
-        lede="Register sites into the AI Grid. Each site receives a one-time enrollment token to establish mTLS identity via SPIFFE."
+        title="Clusters"
+        lede="Manage your enrolled cluster fleet. Register new sites with one-time enrollment tokens to establish mTLS identity via SPIFFE."
         action={
           <Button variant="primary" onClick={() => setIsTokenModalOpen(true)}>
             Enroll new site
