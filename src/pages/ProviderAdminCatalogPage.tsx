@@ -78,6 +78,7 @@ import { ProviderSetupPublishCatalogWizard } from './provider-setup/ProviderSetu
 type ProviderAdminCatalogPageProps = {
   catalogItems: ProviderCatalogDraft[]
   isModelDeploymentMvp?: boolean
+  aiOnlyMode?: boolean
   isEntering?: boolean
   onCreateCatalogItem: (payload: PublishedTemplatePayload) => ProviderCatalogDraft | void
   onCatalogItemsChange?: (items?: ProviderCatalogDraft[]) => void
@@ -311,6 +312,7 @@ function getCatalogItemActions(
 export function ProviderAdminCatalogPage({
   catalogItems,
   isModelDeploymentMvp = false,
+  aiOnlyMode = false,
   isEntering = false,
   onCreateCatalogItem,
   onCatalogItemsChange,
@@ -322,15 +324,19 @@ export function ProviderAdminCatalogPage({
 }: ProviderAdminCatalogPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const visibleCatalogItems = useMemo(
-    () =>
-      isModelDeploymentMvp
+    () => {
+      if (aiOnlyMode) {
+        return catalogItems.filter((item) => getDraftServiceId(item) === 'models')
+      }
+      return isModelDeploymentMvp
         ? catalogItems.filter((item) => getDraftServiceId(item) !== 'models')
-        : catalogItems,
-    [catalogItems, isModelDeploymentMvp],
+        : catalogItems
+    },
+    [catalogItems, isModelDeploymentMvp, aiOnlyMode],
   )
   const initialServiceFilters = visibleCatalogItems.map(getDraftServiceId)
   const [selectedFilters, setSelectedFilters] = useState<Set<CatalogServiceId>>(
-    () => new Set(initialServiceFilters.length > 0 ? initialServiceFilters : ['baremetal']),
+    () => new Set(initialServiceFilters.length > 0 ? initialServiceFilters : aiOnlyMode ? ['models'] : ['baremetal']),
   )
   const [selectedStatus, setSelectedStatus] = useState<'all' | CatalogItemStatus>('all')
   const [organizationFilter, setOrganizationFilter] = useState('')
@@ -953,7 +959,7 @@ export function ProviderAdminCatalogPage({
           presentation="page"
           isOpen={isPublishWizardOpen}
           templates={availableTemplates}
-          hiddenServiceIds={isModelDeploymentMvp ? ['models'] : []}
+          hiddenServiceIds={aiOnlyMode ? ['baremetal', 'cluster', 'virtual-machine'] : isModelDeploymentMvp ? ['models'] : []}
           organizations={organizations}
           defaultTemplateRefId={newestCatalogItem?.templateRefId}
           initialPublishScope={publishResumeScope}
@@ -982,7 +988,7 @@ export function ProviderAdminCatalogPage({
           isOpen={isEditWizardOpen}
           editingCatalog={selectedCatalogItem}
           templates={availableTemplates}
-          hiddenServiceIds={isModelDeploymentMvp ? ['models'] : []}
+          hiddenServiceIds={aiOnlyMode ? ['baremetal', 'cluster', 'virtual-machine'] : isModelDeploymentMvp ? ['models'] : []}
           organizations={organizations}
           initialPublishScope={selectedCatalogItem.scope}
           initialEnterpriseTenantId={editResumeTenantId}
@@ -1036,9 +1042,11 @@ export function ProviderAdminCatalogPage({
             Catalog
           </Title>
           <Content component="p" className="provider-admin-catalog-items__lede">
-            {isModelDeploymentMvp
-              ? 'Create catalog items from master templates across Bare Metal, Clusters, and Virtual machines, then attach them to tenants.'
-              : 'Create catalog items from master templates across Bare Metal, Clusters, Models, and Virtual machines, then attach them to tenants.'}
+            {aiOnlyMode
+              ? 'Create AI model catalog items from curated model endpoints, then attach them to tenants.'
+              : isModelDeploymentMvp
+                ? 'Create catalog items from master templates across Bare Metal, Clusters, and Virtual machines, then attach them to tenants.'
+                : 'Create catalog items from master templates across Bare Metal, Clusters, Models, and Virtual machines, then attach them to tenants.'}
           </Content>
         </FlexItem>
         <FlexItem alignSelf={{ default: 'alignSelfFlexStart' }}>
@@ -1060,7 +1068,7 @@ export function ProviderAdminCatalogPage({
             selectedFilters={selectedFilters}
             serviceCounts={serviceCounts}
             onToggle={handleFilterToggle}
-            hiddenServiceIds={isModelDeploymentMvp ? ['models'] : []}
+            hiddenServiceIds={aiOnlyMode ? ['baremetal', 'cluster', 'virtual-machine'] : isModelDeploymentMvp ? ['models'] : []}
           />
           <PillFilterSelect
             id="catalog-status-filter"

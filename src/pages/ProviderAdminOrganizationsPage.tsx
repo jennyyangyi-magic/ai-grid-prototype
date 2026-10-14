@@ -365,11 +365,11 @@ export function ProviderAdminOrganizationsPage({
   }
 
   const openBillingSetup = (organization: RegisteredOrganization, returnToDetails = false) => {
-    // Same editable Edit-tenant wizard, but land on Billing.
+    // Re-open the edit wizard, landing on IdP federation step.
     setSelectedOrganization(organization)
     setEditingOrganization(organization)
     setOnboardingResumeOrganization(null)
-    setOnboardingInitialStepId('billing_account')
+    setOnboardingInitialStepId('idp_federation')
     setEditReturnToDetails(returnToDetails)
     setIsDetailsOpen(false)
     setIsOnboardingWizardOpen(true)

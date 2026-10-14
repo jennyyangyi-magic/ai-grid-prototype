@@ -1,10 +1,12 @@
 export type ProviderAdminNavId =
   | 'overview'
   | 'ai-grid'
+  | 'ai-grid-enrollment'
   | 'provider-ai-models'
   | 'provider-ai-maas-governance'
   | 'provider-ai-usage'
   | 'provider-ai-model-catalog-settings'
+  | 'provider-ai-observability'
   | 'catalog'
   | 'services-baremetal'
   | 'services-clusters'
@@ -24,6 +26,7 @@ export type ProviderAdminNavId =
   | 'infrastructure-hardware-inventory'
   | 'infrastructure-bmaas-templates'
   | 'administration-organizations'
+  | 'administration-subscription-tiers'
   | 'administration-billing'
   | 'administration-rate-cards'
   | 'system'
@@ -42,6 +45,7 @@ export const PROVIDER_ADMIN_AI_NAV_ITEMS: ProviderAdminNavItem[] = [
   { id: 'ai-grid', label: 'AI Grid' },
   { id: 'provider-ai-models', label: 'Models' },
   { id: 'provider-ai-maas-governance', label: 'MaaS governance' },
+  { id: 'provider-ai-observability', label: 'Observability' },
   { id: 'provider-ai-usage', label: 'Usage' },
 ]
 
@@ -62,6 +66,7 @@ export const PROVIDER_ADMIN_INFRASTRUCTURE_NAV_ITEMS: ProviderAdminNavItem[] = [
 
 export const PROVIDER_ADMIN_ADMINISTRATION_NAV_ITEMS: ProviderAdminNavItem[] = [
   { id: 'administration-organizations', label: 'Tenants' },
+  { id: 'administration-subscription-tiers', label: 'Subscription tiers' },
   { id: 'administration-billing', label: 'Billing' },
 ]
 
@@ -73,7 +78,8 @@ export function isProviderAiNavId(navId: string): boolean {
     navId === 'provider-ai-models' ||
     navId === 'provider-ai-maas-governance' ||
     navId === 'provider-ai-usage' ||
-    navId === 'provider-ai-model-catalog-settings'
+    navId === 'provider-ai-model-catalog-settings' ||
+    navId === 'provider-ai-observability'
   )
 }
 

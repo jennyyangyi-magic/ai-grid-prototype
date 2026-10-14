@@ -721,7 +721,9 @@ export function isProviderAdminNavId(value: string | null): value is ProviderAdm
   return (
     value === 'overview' ||
     value === 'ai-grid' ||
+    value === 'ai-grid-enrollment' ||
     value === 'provider-ai-models' ||
+    value === 'provider-ai-observability' ||
     value === 'provider-ai-maas-governance' ||
     value === 'provider-ai-usage' ||
     value === 'provider-ai-model-catalog-settings' ||

@@ -127,6 +127,10 @@ export type RegisteredOrganization = {
   breakGlassIssuedAt: string | null
   /** Org-scoped roles + first tenant admin assigned after registration. */
   rbacConfigured: boolean
+  /** AI Grid IdP federation config set during onboarding. */
+  idpConfig?: IdpFederationConfig | null
+  /** AI Grid OIDC claim mappings: source IdP group → grid role. */
+  claimMappings?: ClaimMapping[]
   status: 'Pending activation' | 'Active'
   createdAt: string
 }
@@ -158,9 +162,23 @@ export const IDP_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 export type OrganizationSetupNextAction = 'billing' | 'idp' | 'rbac'
 
+export type IdpFederationConfig = {
+  protocol: 'oidc' | 'saml'
+  issuerUrl: string
+  clientId: string
+  clientSecret: string
+  keycloakRealm: string
+}
+
+export type ClaimMapping = {
+  sourceGroup: string
+  gridRole: string
+}
+
 export const TENANT_ONBOARDING_STEPS = [
   { id: 'general', label: 'General' },
-  { id: 'billing_account', label: 'Billing' },
+  { id: 'idp_federation', label: 'IdP federation' },
+  { id: 'claim_mapping', label: 'Claim mapping' },
   { id: 'review', label: 'Review' },
 ] as const
 
@@ -1111,6 +1129,8 @@ export type RegisterOrganizationForm = {
   logoFileName: string
   breakGlassUsername: string
   breakGlassPassword: string
+  idpConfig: IdpFederationConfig
+  claimMappings: ClaimMapping[]
 }
 
 /** BlueSolace values for the register-tenant wizard / Onboarding prefill. */
@@ -1147,6 +1167,17 @@ export const DEFAULT_REGISTER_ORGANIZATION_FORM: RegisterOrganizationForm = {
   logoSrc: getDemoBluesolaceCompanyLogoSrc(),
   logoFileName: DEMO_BLUESOLACE_COMPANY_LOGO_FILE_NAME,
   ...registerFormBreakGlassFields(DEMO_BLUESOLACE_ORG_NAME, DEMO_BLUESOLACE_PRIMARY_DOMAIN),
+  idpConfig: {
+    protocol: 'oidc',
+    issuerUrl: '',
+    clientId: '',
+    clientSecret: '',
+    keycloakRealm: '',
+  },
+  claimMappings: [
+    { sourceGroup: 'engineers', gridRole: 'ai-grid-users' },
+    { sourceGroup: 'platform-admins', gridRole: 'ai-grid-admins' },
+  ],
 }
 
 /** Pending BlueSolace tenant for IdP manager onboarding. Provider-admin NSB seed is separate. */
@@ -1776,6 +1807,17 @@ export function formFromRegisteredOrganization(
     breakGlassPassword: organization.breakGlassPassword?.trim()
       ? rewriteBreakGlassPassword(organization.breakGlassPassword.trim())
       : '',
+    idpConfig: organization.idpConfig ?? {
+      protocol: 'oidc',
+      issuerUrl: '',
+      clientId: '',
+      clientSecret: '',
+      keycloakRealm: '',
+    },
+    claimMappings: organization.claimMappings ?? [
+      { sourceGroup: 'engineers', gridRole: 'ai-grid-users' },
+      { sourceGroup: 'platform-admins', gridRole: 'ai-grid-admins' },
+    ],
   }
 }
 

@@ -1,33 +1,21 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  syncWorkspaceActionParam,
   syncWorkspaceNavParam,
-  WORKSPACE_ACTION_REGISTER_TENANT,
 } from '../shared/workspaceNavUrl'
 import { ProviderAdminShell } from '../components/provider-admin/ProviderAdminShell'
 import { ProviderSetupWizardPanel } from '../components/provider-setup/ProviderSetupWizardPanel'
 import type { ProviderAdminNavId } from '../providerAdmin/constants'
 import { isServicesNavId, resolveProviderAdminNavId } from '../providerAdmin/constants'
-import { ProviderAdminCatalogPage } from './ProviderAdminCatalogPage'
 import { ProviderAdminOverviewPage } from './ProviderAdminOverviewPage'
-import { ProviderAdminBmaasTemplatesPage } from './infrastructure/ProviderAdminBmaasTemplatesPage'
-import { ProviderAdminDataCentersPage } from './infrastructure/ProviderAdminDataCentersPage'
-import { ProviderAdminHardwareInventoryPage } from './infrastructure/ProviderAdminHardwareInventoryPage'
-import { ProviderAdminBillingPage } from './ProviderAdminBillingPage'
 import { ProviderAdminOrganizationsPage } from './ProviderAdminOrganizationsPage'
-import { ProviderAdminRateCardsPage } from './ProviderAdminRateCardsPage'
-import { ProviderAdminExternalNetworksPage } from './infrastructure/ProviderAdminExternalNetworksPage'
-import { PlaceholderProviderAdminPage } from './PlaceholderProviderAdminPage'
+import { ProviderAdminObservabilityPage } from './ProviderAdminObservabilityPage'
 import { ProviderServiceSelectionPage } from './provider-setup/ProviderServiceSelectionPage'
-import { TenantSecretsPage } from './tenant/TenantSecretsPage'
 import TenantAdminModelsPage from './tenant-admin/ai/models/TenantAdminModelsPage'
 import { MaaSGovernancePage } from './tenant-admin/ai/maas-governance'
 import { ModelCatalogSettingsPage } from './tenant-admin/ai/model-catalog-settings'
+import { ProviderAdminGridEnrollmentPage } from './ProviderAdminGridEnrollmentPage'
 import { VisionModelFleetPage } from './provider-admin/vision/VisionModelFleetPage'
-import { AiAssetEndpointsPage } from './tenant-user/genai/asset-endpoints/AiAssetEndpointsPage'
-import { GenaiApiKeysPage } from './tenant-user/genai/api-keys'
-import { PlaygroundPage } from './tenant-user/genai/playground'
 import {
   GENAI_API_KEYS_DETAIL_PARAMS,
   MAAS_GOVERNANCE_DETAIL_PARAMS,
@@ -55,7 +43,6 @@ import {
   setProviderSetupComplete,
 } from '../providerSetup/storage'
 import type { WorkspaceTransition } from '../providerAdmin/workspace'
-import type { BmaasTemplateLookup } from '../providerAdmin/bmaasTemplates'
 
 type ProviderModelsTab = 'catalog' | 'deployments'
 
@@ -101,8 +88,7 @@ export function ProviderAdminWorkspacePage() {
     isProviderSetupComplete() ? ensureProviderCatalogDemoItems() : getProviderCatalogItems(),
   )
   const [workspaceTransition, setWorkspaceTransition] = useState<WorkspaceTransition>('idle')
-  const [openTemplateLookup, setOpenTemplateLookup] = useState<BmaasTemplateLookup | null>(null)
-  const [openCatalogItemKey, setOpenCatalogItemKey] = useState<string | null>(null)
+  const [, setOpenCatalogItemKey] = useState<string | null>(null)
   const [providerModelsInitialTab, setProviderModelsInitialTab] =
     useState<ProviderModelsTab>('deployments')
   const [navContentKey, setNavContentKey] = useState(0)
@@ -253,22 +239,6 @@ export function ProviderAdminWorkspacePage() {
     return draft
   }
 
-  const handleRegisterOrganization = () => {
-    const openRegister = () => {
-      setActiveNavId('administration-organizations')
-      setProviderActiveNav('administration-organizations')
-      setNavContentKey((current) => current + 1)
-      syncWorkspaceActionParam(setSearchParams, WORKSPACE_ACTION_REGISTER_TENANT)
-    }
-
-    if (catalogEditLeaveAttemptRef.current) {
-      catalogEditLeaveAttemptRef.current(openRegister)
-      return
-    }
-
-    openRegister()
-  }
-
   const performNavChange = (navId: ProviderAdminNavId) => {
     const resolvedNavId = resolveProviderAdminNavId(navId)
     setActiveNavId(resolvedNavId)
@@ -308,33 +278,18 @@ export function ProviderAdminWorkspacePage() {
     }
 
     switch (resolvedActiveNavId) {
-      case 'catalog':
-        return (
-          <ProviderAdminCatalogPage
-            catalogItems={catalogItems}
-            isModelDeploymentMvp={isModelDeploymentMvp}
-            isEntering={workspaceTransition === 'entering'}
-            onCreateCatalogItem={handleCreateCatalogItem}
-            onCatalogItemsChange={(items) => setCatalogItems(items ?? getProviderCatalogItems())}
-            isPublishing={workspaceTransition !== 'idle'}
-            onRegisterOrganization={handleRegisterOrganization}
-            openCatalogItemKey={openCatalogItemKey}
-            onOpenCatalogItemConsumed={() => setOpenCatalogItemKey(null)}
-            onEditLeaveAttemptChange={(attemptLeave) => {
-              catalogEditLeaveAttemptRef.current = attemptLeave
-            }}
-          />
-        )
       case 'ai-grid':
         return (
           <VisionModelFleetPage
             catalogItems={catalogItems}
             onOpenCatalogPreset={(catalogItemId) => {
               setOpenCatalogItemKey(catalogItemId)
-              handleNavChange('catalog')
+              handleNavChange('ai-grid')
             }}
           />
         )
+      case 'ai-grid-enrollment':
+        return <ProviderAdminGridEnrollmentPage />
       case 'provider-ai-models':
         return (
           <TenantAdminModelsPage
@@ -371,57 +326,19 @@ export function ProviderAdminWorkspacePage() {
             isModelDeploymentMvp={isModelDeploymentMvp}
           />
         )
-      case 'provider-ai-usage':
-        return (
-          <PlaceholderProviderAdminPage
-            title="AI usage"
-            description="Review AI model usage across the provider environment."
-          />
-        )
-      case 'genai-asset-endpoints':
-        return (
-          <AiAssetEndpointsPage
-            onNavigateToPlayground={() => handleNavChange('genai-playground')}
-          />
-        )
-      case 'genai-playground':
-        return <PlaygroundPage />
-      case 'genai-api-keys':
-        return <GenaiApiKeysPage />
-      case 'infrastructure-data-centers':
-        return <ProviderAdminDataCentersPage />
-      case 'infrastructure-hardware-inventory':
-        return <ProviderAdminHardwareInventoryPage />
-      case 'infrastructure-bmaas-templates':
-        return (
-          <ProviderAdminBmaasTemplatesPage
-            onCreateCatalogItem={handleCreateCatalogItem}
-            isPublishing={workspaceTransition !== 'idle'}
-            openTemplateLookup={openTemplateLookup}
-            onOpenTemplateConsumed={() => setOpenTemplateLookup(null)}
-          />
-        )
-      case 'networking':
-        return <ProviderAdminExternalNetworksPage />
-      case 'secrets':
-        return <TenantSecretsPage scope="provider" tenantSlug="" />
+      case 'provider-ai-observability':
+        return <ProviderAdminObservabilityPage />
       case 'administration-organizations':
         return <ProviderAdminOrganizationsPage onNavigate={handleNavChange} />
-      case 'administration-billing':
-        return <ProviderAdminBillingPage />
-      case 'administration-rate-cards':
-        return <ProviderAdminRateCardsPage />
-      case 'system':
-        return (
-          <PlaceholderProviderAdminPage
-            title="System"
-            description="Review platform configuration, integrations, and operational settings."
-          />
-        )
-      case 'overview':
       default:
         return (
-          <ProviderAdminOverviewPage />
+          <VisionModelFleetPage
+            catalogItems={catalogItems}
+            onOpenCatalogPreset={(catalogItemId) => {
+              setOpenCatalogItemKey(catalogItemId)
+              handleNavChange('ai-grid')
+            }}
+          />
         )
     }
   }

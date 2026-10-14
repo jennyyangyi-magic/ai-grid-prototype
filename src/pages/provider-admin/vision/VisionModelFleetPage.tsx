@@ -53,6 +53,7 @@ import { VisionFleetMap } from './VisionFleetMap'
 import { VisionFleetSummary } from './VisionFleetSummary'
 import { VisionGridFilters } from './VisionGridFilters'
 import { VisionGridPanel } from './VisionGridPanel'
+import { VisionAttentionStrip } from './VisionAttentionStrip'
 import { VisionPlaceModelModal } from './VisionPlaceModelModal'
 
 type VisionModelFleetPageProps = {
@@ -361,7 +362,11 @@ export const VisionModelFleetPage = ({
           >
             <DrawerContentBody className="pf-v6-u-h-100 pf-v6-u-min-height">
               <Stack className="pf-v6-u-h-100">
-                <StackItem isFilled className="pf-v6-u-min-height">
+                <StackItem isFilled className="pf-v6-u-min-height" style={{ position: 'relative' }}>
+                  <VisionAttentionStrip
+                    clusters={visibleClusters}
+                    onSelectCluster={handlePinCluster}
+                  />
                   <VisionFleetMap
                     clusters={visibleClusters}
                     selectedClusterId={selectedClusterId}

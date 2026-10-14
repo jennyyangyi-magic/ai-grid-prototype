@@ -20,7 +20,6 @@ import {
   MastheadToggle,
   MenuToggle,
   Nav,
-  NavExpandable,
   NavItem,
   NavList,
   Page,
@@ -35,15 +34,7 @@ import {
   ToolbarItem,
 } from '@patternfly/react-core'
 import {
-  PROVIDER_ADMIN_ADMINISTRATION_NAV_ITEMS,
-  PROVIDER_ADMIN_AI_NAV_ITEMS,
-  PROVIDER_ADMIN_MODEL_DEPLOYMENT_MVP_AI_NAV_ITEMS,
-  PROVIDER_ADMIN_NETWORKING_NAV_ID,
-  PROVIDER_ADMIN_NETWORKING_NAV_LABEL,
   resolveProviderAdminNavId,
-  isAdministrationNavId,
-  isProviderAiNavId,
-  isNetworkingNavId,
   type ProviderAdminNavId,
 } from '../../providerAdmin/constants'
 import { clearProviderOnboardingState } from '../../providerSetup/storage'
@@ -66,49 +57,21 @@ export function ProviderAdminShell({
   activeNavId = 'overview',
   onNavChange,
   workspaceTransition = 'idle',
-  isModelDeploymentMvp = false,
+  isModelDeploymentMvp: _isModelDeploymentMvp = false,
 }: ProviderAdminShellProps) {
   const navigate = useNavigate()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false)
-  const [expandedNavGroups, setExpandedNavGroups] = useState<Set<string>>(
-    () => new Set(isProviderAiNavId(activeNavId) ? ['ai'] : []),
-  )
-  const providerAiNavItems = isModelDeploymentMvp
-    ? PROVIDER_ADMIN_MODEL_DEPLOYMENT_MVP_AI_NAV_ITEMS
-    : PROVIDER_ADMIN_AI_NAV_ITEMS
   const isContentFilled = activeNavId === 'ai-grid'
-  const aiNavigation = (
-    <NavExpandable
-      id="provider-admin-ai-nav"
-      title="AI"
-      isExpanded={expandedNavGroups.has('ai')}
-      isActive={isProviderAiNavId(activeNavId)}
-      onExpand={(_event, isExpanded) => {
-        setExpandedNavGroups((current) => {
-          const next = new Set(current)
-          if (isExpanded) {
-            next.add('ai')
-          } else {
-            next.delete('ai')
-          }
-          return next
-        })
-      }}
-    >
-      {providerAiNavItems.map((item) => (
-        <NavItem
-          key={item.id}
-          itemId={item.id}
-          isActive={activeNavId === item.id}
-          to="#"
-          preventDefault
-        >
-          {item.label}
-        </NavItem>
-      ))}
-    </NavExpandable>
-  )
+
+  const AI_GRID_FLAT_NAV: { id: ProviderAdminNavId; label: string }[] = [
+    { id: 'ai-grid', label: 'AI Grid' },
+    { id: 'ai-grid-enrollment', label: 'Grid enrollment' },
+    { id: 'provider-ai-models', label: 'Models' },
+    { id: 'provider-ai-maas-governance', label: 'MaaS governance' },
+    { id: 'provider-ai-observability', label: 'Observability' },
+    { id: 'administration-organizations', label: 'Tenants' },
+  ]
 
   const header = (
     <Masthead>
@@ -206,62 +169,21 @@ export function ProviderAdminShell({
           }}
         >
           <NavList>
-            <NavItem
-              itemId="overview"
-              isActive={activeNavId === 'overview'}
-              to="#"
-              preventDefault
-            >
-              Overview
-            </NavItem>
-            <NavItem itemId="catalog" isActive={activeNavId === 'catalog'} to="#" preventDefault>
-              Catalog
-            </NavItem>
-            {aiNavigation}
-            <NavExpandable
-              id="provider-admin-administration-nav"
-              title="Administration"
-              isExpanded={expandedNavGroups.has('administration')}
-              isActive={isAdministrationNavId(activeNavId)}
-              onExpand={(_event, isExpanded) => {
-                setExpandedNavGroups((current) => {
-                  const next = new Set(current)
-                  if (isExpanded) {
-                    next.add('administration')
-                  } else {
-                    next.delete('administration')
-                  }
-                  return next
-                })
-              }}
-            >
-              {PROVIDER_ADMIN_ADMINISTRATION_NAV_ITEMS.map((item) => (
-                <NavItem
-                  key={item.id}
-                  itemId={item.id}
-                  isActive={
-                    activeNavId === item.id ||
-                    (activeNavId === 'provider-ai-model-catalog-settings' &&
-                      item.id === 'provider-ai-models')
-                  }
-                  to="#"
-                  preventDefault
-                >
-                  {item.label}
-                </NavItem>
-              ))}
-            </NavExpandable>
-            <NavItem
-              itemId={PROVIDER_ADMIN_NETWORKING_NAV_ID}
-              isActive={isNetworkingNavId(activeNavId)}
-              to="#"
-              preventDefault
-            >
-              {PROVIDER_ADMIN_NETWORKING_NAV_LABEL}
-            </NavItem>
-            <NavItem itemId="secrets" isActive={activeNavId === 'secrets'} to="#" preventDefault>
-              Secrets
-            </NavItem>
+            {AI_GRID_FLAT_NAV.map((item) => (
+              <NavItem
+                key={item.id}
+                itemId={item.id}
+                isActive={
+                  activeNavId === item.id ||
+                  (activeNavId === 'provider-ai-model-catalog-settings' &&
+                    item.id === 'provider-ai-models')
+                }
+                to="#"
+                preventDefault
+              >
+                {item.label}
+              </NavItem>
+            ))}
           </NavList>
         </Nav>
       </PageSidebarBody>

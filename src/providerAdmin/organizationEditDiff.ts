@@ -19,6 +19,9 @@ type OrganizationEditSnapshot = {
   additionalDomains: EditSnapshotValue
   logo: EditSnapshotValue
   m360AccountId: EditSnapshotValue
+  idpProtocol: EditSnapshotValue
+  idpIssuerUrl: EditSnapshotValue
+  claimMappings: EditSnapshotValue
 }
 
 function formatAdditionalDomains(domains: string[], primaryDomain: string): string {
@@ -42,6 +45,10 @@ export function buildOrganizationEditSnapshot(
   const additionalDomains = normalizeAdditionalDomains(form.additionalDomains, primaryDomain)
   const m360AccountId = (options?.m360AccountId ?? form.m360AccountId).trim()
 
+  const idpProtocol = form.idpConfig?.protocol ?? 'oidc'
+  const idpIssuerUrl = form.idpConfig?.issuerUrl?.trim() ?? ''
+  const claimMappingsStr = JSON.stringify(form.claimMappings ?? [])
+
   return {
     organizationName: editSnapshotValue(form.organizationName, form.organizationName.trim() || '—'),
     displayName: editSnapshotValue(form.displayName, form.displayName.trim() || '—'),
@@ -55,6 +62,9 @@ export function buildOrganizationEditSnapshot(
       formatLogo(form.logoSrc, form.logoFileName),
     ),
     m360AccountId: editSnapshotValue(m360AccountId, m360AccountId || '—'),
+    idpProtocol: editSnapshotValue(idpProtocol, idpProtocol.toUpperCase()),
+    idpIssuerUrl: editSnapshotValue(idpIssuerUrl, idpIssuerUrl || '—'),
+    claimMappings: editSnapshotValue(claimMappingsStr, claimMappingsStr),
   }
 }
 
@@ -76,6 +86,14 @@ export function buildOrganizationEditSnapshotFromOrganization(
     logoFileName: organization.logoFileName?.trim() || '',
     breakGlassUsername: organization.breakGlassUsername?.trim() || '',
     breakGlassPassword: '',
+    idpConfig: organization.idpConfig ?? {
+      protocol: 'oidc',
+      issuerUrl: '',
+      clientId: '',
+      clientSecret: '',
+      keycloakRealm: '',
+    },
+    claimMappings: organization.claimMappings ?? [],
   })
 }
 
@@ -89,7 +107,10 @@ export function getOrganizationEditChanges(
     { id: 'primaryDomain', stepId: 'general', label: 'Primary email domain' },
     { id: 'additionalDomains', stepId: 'general', label: 'Additional email domains' },
     { id: 'logo', stepId: 'general', label: 'Company logo' },
-    { id: 'm360AccountId', stepId: 'billing_account', label: 'M360 billing account' },
+    { id: 'm360AccountId', stepId: 'general', label: 'M360 billing account' },
+    { id: 'idpProtocol', stepId: 'idp_federation', label: 'IdP protocol' },
+    { id: 'idpIssuerUrl', stepId: 'idp_federation', label: 'Issuer URL' },
+    { id: 'claimMappings', stepId: 'claim_mapping', label: 'Claim mappings' },
   ])
 }
 
