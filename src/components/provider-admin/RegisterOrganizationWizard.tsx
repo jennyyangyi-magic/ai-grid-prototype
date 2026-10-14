@@ -607,7 +607,7 @@ export function RegisterOrganizationWizard({
       {REGISTER_ORGANIZATION_STEPS.map((step) => {
         const isOrganizationStepModified =
           step.id === 'organization' &&
-          (modifiedStepIds.has('general') || modifiedStepIds.has('billing_account'))
+          (modifiedStepIds.has('general') || modifiedStepIds.has('idp_federation'))
 
         return (
           <WizardStep
