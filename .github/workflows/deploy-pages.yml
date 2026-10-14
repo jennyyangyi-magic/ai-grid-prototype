@@ -29,7 +29,7 @@ jobs:
           node-version: '22'
           cache: npm
       - name: Install
-        run: npm ci
+        run: npm install --no-audit
       - name: Build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
